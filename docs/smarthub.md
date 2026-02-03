@@ -10,7 +10,7 @@ shutters or my LED lights.
 
 The information will be fetched from various APIs (like Google, etc) as well as my local weather station. 
 
-I plan to build the visu in Vue since I already have some decent experience with it.
+We plan to build the visu in Vue since I already have some decent experience with it.
 
 ## Previous Documentation
 
