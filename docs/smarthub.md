@@ -15,6 +15,7 @@ We plan to build the visu in Vue since I already have some decent experience wit
 ## Docs
 
 - [project-summary](https://docs.google.com/document/d/1rOldfkN6JOx5C-b0s65jZoEOO5_lDyWK33yaFhDvHEo/edit?usp=sharing)
+- [project-roadmap](https://docs.google.com/spreadsheets/d/1nQqXa05nbYaGdj86vXVb_M87mKO-v5JElGkmInbXO2s/edit?usp=sharing)
 
 ## Previous Documentation (partly outdated)
 
