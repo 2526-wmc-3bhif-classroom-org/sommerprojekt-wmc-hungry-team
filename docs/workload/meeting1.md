@@ -1,10 +1,12 @@
 # #1
 
-## Summary
+## summary of current state
 
-Project start: 
+Project start: Vue Frontend
 
-## Workload
+- created the vue frontend structure
+
+## workload until next time
 
 ### Arthur
 
