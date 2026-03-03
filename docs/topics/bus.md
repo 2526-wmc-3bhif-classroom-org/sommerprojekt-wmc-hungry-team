@@ -8,4 +8,6 @@ The data will be stored as a PostgreSQL database for ease of access. The extensi
 npm install -g gtfs-via-postgres
 ```
 
+The container with the db will eventually run on a different server inside the network so we want to make it easy to configure the IP of this server in the future.
+
 
