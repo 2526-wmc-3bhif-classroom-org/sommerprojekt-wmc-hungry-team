@@ -4,7 +4,7 @@
 
 The smarthub is a web app running on a raspberry-pi, it is connected to an LCD panel that is positioned over my nightstand.
 
-It should help th user get organized in the morning by displaying information about bus-routes, traffic, weather, todolists 
+It should help the user get organized in the morning by displaying information about bus-routes, traffic, weather, todolist 
 and other information as well as make a room easier to control by having a KNX connection to various IOT-devices like
 shutters or LED lights.
 
