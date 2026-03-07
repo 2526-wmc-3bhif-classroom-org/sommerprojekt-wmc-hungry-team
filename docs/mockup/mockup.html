@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Mockup</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+
+:root{
+--blue-dark:#3f5f7a;
+--bg:#f4f6f8;
+}
+
+/* GLOBAL */
+
+body{
+margin:0;
+font-family:Segoe UI,Arial,sans-serif;
+background:var(--bg);
+overflow:hidden;
+}
+
+header{
+background:var(--blue-dark);
+color:white;
+padding:14px 26px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+font-size:clamp(14px,1.5vw,20px);
+}
+
+/* LAYOUT */
+
+.container{
+height:calc(100vh - 60px);
+padding:20px;
+display:grid;
+grid-template-columns:1.2fr 1fr;
+gap:18px;
+}
+
+.widgets{
+display:grid;
+grid-template-rows:repeat(4,1fr);
+gap:16px;
+}
+
+.card{
+background:white;
+border-radius:14px;
+padding:18px;
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+display:flex;
+flex-direction:column;
+justify-content:center;
+overflow:hidden;
+}
+
+/* TEXT AUTO SCALE */
+
+.small-title{
+font-size:clamp(10px,1vw,14px);
+color:#666;
+margin-bottom:6px;
+}
+
+.clock{
+font-size:clamp(24px,3vw,48px);
+font-weight:600;
+}
+
+.date{
+font-size:clamp(12px,1.4vw,18px);
+color:#555;
+}
+
+.alarm{
+font-size:clamp(14px,1.8vw,24px);
+margin-top:6px;
+color:#333;
+}
+
+.info{
+font-size:clamp(12px,1.5vw,18px);
+}
+
+.traffic-item{
+font-size:clamp(11px,1.3vw,16px);
+margin-bottom:4px;
+}
+
+/* MAP */
+
+.map-section{
+display:grid;
+grid-template-rows:1fr 90px;
+gap:14px;
+}
+
+#map{
+width:100%;
+height:100%;
+border-radius:14px;
+}
+
+.route-stats{
+background:white;
+border-radius:14px;
+padding:14px;
+display:flex;
+justify-content:space-around;
+align-items:center;
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+font-size:clamp(12px,1.3vw,16px);
+}
+
+.stat-value{
+font-size:clamp(16px,1.8vw,22px);
+font-weight:600;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<div>Smarthub</div>
+</header>
+
+<div class="container">
+
+<!-- LEFT SIDE -->
+
+<div class="widgets">
+
+<!-- CLOCK + ALARM -->
+
+<div class="card">
+
+<div class="small-title">Uhrzeit</div>
+
+<div class="clock" id="clock"></div>
+
+<div class="date" id="date"></div>
+
+<div class="alarm" id="alarmTime"></div>
+
+</div>
+
+<!-- WEATHER -->
+
+<div class="card">
+
+<div class="small-title">Wetter</div>
+
+<div class="info">
+12°C<br>
+leicht bewölkt
+</div>
+
+</div>
+
+<!-- CALENDAR -->
+
+<div class="card">
+
+<div class="small-title">Termine</div>
+
+<div class="info">
+09:00 Meeting<br>
+12:00 Lunch<br>
+15:00 Projekt Review
+</div>
+
+</div>
+
+<!-- TRAFFIC -->
+
+<div class="card">
+
+<div class="small-title">Verkehr</div>
+
+<div class="traffic-item">A1 Linz → Amstetten : +5 min</div>
+<div class="traffic-item">Baustelle bei Enns</div>
+<div class="traffic-item">Stockender Verkehr Wien</div>
+
+</div>
+
+</div>
+
+<!-- MAP -->
+
+<div class="map-section">
+
+<div id="map"></div>
+
+<div class="route-stats">
+
+<div>
+<div>Fahrzeit</div>
+<div class="stat-value">25 min</div>
+</div>
+
+<div>
+<div>Ankunft</div>
+<div class="stat-value">08:55</div>
+</div>
+
+<div>
+<div>Verspätung</div>
+<div class="stat-value">+5 min</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+/* CLOCK */
+
+function updateClock(){
+
+const now=new Date()
+
+const time=now.toLocaleTimeString("de-AT",{
+hour:"2-digit",
+minute:"2-digit",
+second:"2-digit"
+})
+
+const date=now.toLocaleDateString("de-AT",{
+weekday:"long",
+day:"2-digit",
+month:"2-digit",
+year:"numeric"
+})
+
+document.getElementById("clock").textContent=time
+document.getElementById("clockHeader").textContent=time
+document.getElementById("date").textContent=date
+
+}
+
+setInterval(updateClock,1000)
+updateClock()
+
+/* ALARM CALCULATION (Mock) */
+
+function calculateAlarm(){
+
+const meetingHour=9
+const meetingMinute=0
+
+const travelMinutes=25
+const buffer=20
+
+const meeting=new Date()
+meeting.setHours(meetingHour)
+meeting.setMinutes(meetingMinute)
+
+const alarm=new Date(meeting - (travelMinutes+buffer)*60000)
+
+const alarmString=alarm.toLocaleTimeString("de-AT",{
+hour:"2-digit",
+minute:"2-digit"
+})
+
+document.getElementById("alarmTime").textContent="Wecker: "+alarmString
+
+}
+
+calculateAlarm()
+
+/* MAP */
+
+const map=L.map("map").setView([48.3,14.3],10)
+
+L.tileLayer(
+"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+{attribution:"© OpenStreetMap"}
+).addTo(map)
+
+/* ROUTE */
+
+const route=L.polyline([
+[48.3,14.3],
+[48.26,14.45],
+[48.2,14.55]
+],{color:"blue"}).addTo(map)
+
+/* MOCK TRAFFIC */
+
+const jam=L.circle([48.26,14.45],{
+color:"red",
+radius:800
+}).addTo(map)
+
+jam.bindPopup("Stau +5 Minuten")
+
+const construction=L.circle([48.23,14.50],{
+color:"orange",
+radius:700
+}).addTo(map)
+
+construction.bindPopup("Baustelle")
+
+</script>
+
+</body>
+</html>
