@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Dashboard</title>
+
+<style>
+
+:root{
+--blue-dark:#3f5f7a;
+--bg:#f4f6f8;
+--route:#1e88e5;
+}
+
+/* GLOBAL */
+
+body{
+margin:0;
+font-family:Segoe UI,Arial,sans-serif;
+background:var(--bg);
+overflow:hidden;
+}
+
+header{
+background:var(--blue-dark);
+color:white;
+padding:14px 26px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+font-size:clamp(14px,1.5vw,20px);
+}
+
+/* LAYOUT */
+
+.container{
+height:calc(100vh - 60px);
+padding:20px;
+display:grid;
+grid-template-columns:1.2fr 1fr;
+gap:18px;
+}
+
+.widgets{
+display:grid;
+grid-template-rows:repeat(3,1fr);
+gap:16px;
+}
+
+.card{
+background:white;
+border-radius:14px;
+padding:20px;
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+display:flex;
+flex-direction:column;
+justify-content:center;
+}
+
+/* TEXT */
+
+.small-title{
+font-size:clamp(10px,1vw,14px);
+color:#666;
+margin-bottom:6px;
+}
+
+.clock{
+font-size:clamp(26px,3vw,48px);
+font-weight:600;
+}
+
+.date{
+font-size:clamp(12px,1.4vw,18px);
+color:#555;
+}
+
+.alarm{
+font-size:clamp(14px,1.6vw,22px);
+margin-top:6px;
+color:#333;
+}
+
+.info{
+font-size:clamp(14px,1.6vw,20px);
+}
+
+/* ROUTE */
+
+.route-section{
+display:grid;
+grid-template-rows:1fr 90px;
+gap:14px;
+}
+
+.route-card{
+background:white;
+border-radius:14px;
+padding:20px;
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+position:relative;
+overflow:hidden;
+}
+
+.route-title{
+text-align:center;
+font-size:20px;
+font-weight:600;
+margin-bottom:20px;
+}
+
+.route-line{
+position:absolute;
+left:50%;
+top:90px;
+bottom:60px;
+width:4px;
+background:var(--route);
+transform:translateX(-50%);
+}
+
+.stop{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin:30px 0;
+position:relative;
+}
+
+.stop-left{
+width:40%;
+text-align:right;
+padding-right:20px;
+font-size:14px;
+}
+
+.stop-right{
+width:40%;
+text-align:left;
+padding-left:20px;
+font-size:14px;
+}
+
+.dot{
+position:absolute;
+left:50%;
+width:16px;
+height:16px;
+background:white;
+border:4px solid var(--route);
+border-radius:50%;
+transform:translate(-50%);
+}
+
+.transfer{
+background:var(--route);
+color:white;
+border-radius:50%;
+width:60px;
+height:60px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:12px;
+text-align:center;
+}
+
+/* ROUTE STATS */
+
+.route-stats{
+background:white;
+border-radius:14px;
+padding:14px;
+display:flex;
+justify-content:space-around;
+align-items:center;
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+font-size:clamp(12px,1.3vw,16px);
+}
+
+.stat-value{
+font-size:clamp(16px,1.8vw,22px);
+font-weight:600;
+}
+
+/* SETTINGS BUTTON */
+
+#settingsGear{
+position:fixed;
+bottom:20px;
+left:20px;
+background:white;
+border-radius:50%;
+width:50px;
+height:50px;
+display:flex;
+justify-content:center;
+align-items:center;
+box-shadow:0 4px 12px rgba(0,0,0,0.2);
+cursor:pointer;
+font-size:24px;
+color:var(--blue-dark);
+opacity:0;
+pointer-events:none;
+transition:opacity 0.3s, transform 0.2s;
+z-index:10;
+}
+
+#settingsGear:hover{
+transform:rotate(20deg);
+}
+
+/* Hover area for showing settings */
+#hoverCorner{
+position:fixed;
+bottom:0;
+left:0;
+width:80px;
+height:80px;
+z-index:5;
+}
+
+/* Show gear when hover on corner */
+#hoverCorner:hover + #settingsGear{
+opacity:1;
+pointer-events:auto;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<div>Daily Dashboard</div>
+<div id="clockHeader"></div>
+</header>
+
+<div class="container">
+
+<!-- LEFT SIDE -->
+
+<div class="widgets">
+
+<!-- CLOCK -->
+
+<div class="card">
+
+<div class="small-title">Uhrzeit</div>
+
+<div class="clock" id="clock"></div>
+
+<div class="date" id="date"></div>
+
+<div class="alarm" id="alarmTime"></div>
+
+</div>
+
+<!-- WEATHER -->
+
+<div class="card">
+
+<div class="small-title">Wetter</div>
+
+<div class="info">
+12°C<br>
+leicht bewölkt
+</div>
+
+</div>
+
+<!-- CALENDAR -->
+
+<div class="card">
+
+<div class="small-title">Termine</div>
+
+<div class="info">
+09:00 Meeting<br>
+12:00 Lunch<br>
+15:00 Projekt Review
+</div>
+
+</div>
+
+</div>
+
+<!-- ROUTE -->
+
+<div class="route-section">
+
+<div class="route-card">
+
+<div class="route-title">Route B7 Express</div>
+
+<div class="route-line"></div>
+
+<div class="stop">
+<div class="stop-left">
+City Center<br>
+08:00
+</div>
+<div class="dot"></div>
+<div class="stop-right">
+Start
+</div>
+</div>
+
+<div class="stop">
+<div class="stop-left">
+Financial District<br>
+08:15
+</div>
+<div class="dot"></div>
+<div class="stop-right">
+Bus B7
+</div>
+</div>
+
+<div class="stop">
+<div class="stop-left"></div>
+
+<div class="transfer">
+Umstieg<br>B12
+</div>
+
+<div class="stop-right">
+Central Hub
+</div>
+</div>
+
+<div class="stop">
+<div class="stop-left">
+University<br>
+08:45
+</div>
+<div class="dot"></div>
+<div class="stop-right">
+Tram
+</div>
+</div>
+
+<div class="stop">
+<div class="stop-left">
+Campus<br>
+09:00
+</div>
+<div class="dot"></div>
+<div class="stop-right">
+Ziel
+</div>
+</div>
+
+</div>
+
+<div class="route-stats">
+
+<div>
+<div>Fahrzeit</div>
+<div class="stat-value">1h</div>
+</div>
+
+<div>
+<div>Umstiege</div>
+<div class="stat-value">1</div>
+</div>
+
+<div>
+<div>Ankunft</div>
+<div class="stat-value">09:00</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- HOVER AREA & SETTINGS BUTTON -->
+
+<div id="hoverCorner"></div>
+<div id="settingsGear" title="Einstellungen öffnen">&#9881;</div>
+
+<script>
+
+/* CLOCK */
+
+function updateClock(){
+
+const now=new Date()
+
+const time=now.toLocaleTimeString("de-AT",{
+hour:"2-digit",
+minute:"2-digit",
+second:"2-digit"
+})
+
+const date=now.toLocaleDateString("de-AT",{
+weekday:"long",
+day:"2-digit",
+month:"2-digit",
+year:"numeric"
+})
+
+document.getElementById("clock").textContent=time
+document.getElementById("clockHeader").textContent=time
+document.getElementById("date").textContent=date
+
+}
+
+setInterval(updateClock,1000)
+updateClock()
+
+/* ALARM */
+
+function calculateAlarm(){
+
+const meetingHour=9
+const meetingMinute=0
+
+const travelMinutes=60
+const buffer=20
+
+const meeting=new Date()
+meeting.setHours(meetingHour)
+meeting.setMinutes(meetingMinute)
+
+const alarm=new Date(meeting - (travelMinutes+buffer)*60000)
+
+const alarmString=alarm.toLocaleTimeString("de-AT",{
+hour:"2-digit",
+minute:"2-digit"
+})
+
+document.getElementById("alarmTime").textContent="Wecker: "+alarmString
+
+}
+
+calculateAlarm()
+
+/* SETTINGS BUTTON CLICK */
+
+document.getElementById("settingsGear").addEventListener("click",()=>{
+alert("Einstellungen öffnen (Mockup)");
+})
+
+</script>
+
+</body>
+</html>
