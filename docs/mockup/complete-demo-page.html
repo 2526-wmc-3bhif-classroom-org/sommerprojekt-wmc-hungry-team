@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Dashboard mit Routinen</title>
+<style>
+:root{
+  --blue-dark:#3f5f7a;
+  --blue:#6f97b5;
+  --blue-light:#9fc0d9;
+  --bg:#f4f6f8;
+  --card-bg:white;
+  --route:#1e88e5;
+}
+
+/* BODY */
+body{
+  margin:0;
+  font-family:Segoe UI,Arial,sans-serif;
+  background:var(--bg);
+}
+
+/* HEADER */
+header{
+  background:var(--blue-dark);
+  color:white;
+  padding:14px 26px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+/* CONTAINER */
+.container{
+  display:grid;
+  grid-template-columns:1.2fr 1fr;
+  gap:18px;
+  padding:20px;
+  height:calc(100vh - 60px);
+}
+
+/* LEFT WIDGETS */
+.widgets{
+  display:grid;
+  grid-template-rows:repeat(3,1fr);
+  gap:16px;
+}
+
+.card{
+  background:white;
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.small-title{font-size:12px;color:#555;margin-bottom:6px;}
+.clock{font-size:36px;font-weight:600;}
+.date{font-size:14px;color:#666;margin-top:4px;}
+.alarm{font-size:16px;color:#333;margin-top:6px;}
+.weather{font-size:16px;}
+
+/* RIGHT SECTION (Flowchart / Route) */
+.route-section{
+  display:grid;
+  grid-template-rows:1fr 90px;
+  gap:14px;
+}
+.route-card{
+  background:white;
+  border-radius:14px;
+  padding:20px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+  position:relative;
+  overflow:hidden;
+}
+.route-title{text-align:center;font-size:18px;font-weight:600;margin-bottom:20px;}
+.route-line{position:absolute;left:50%;top:90px;bottom:60px;width:4px;background:var(--route);transform:translateX(-50%);}
+.stop{display:flex;justify-content:space-between;align-items:center;margin:30px 0;position:relative;}
+.stop-left{width:40%;text-align:right;padding-right:20px;font-size:14px;}
+.stop-right{width:40%;text-align:left;padding-left:20px;font-size:14px;}
+.dot{position:absolute;left:50%;width:16px;height:16px;background:white;border:4px solid var(--route);border-radius:50%;transform:translate(-50%);}
+.transfer{background:var(--route);color:white;border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-size:12px;text-align:center;}
+
+/* ROUTE STATS */
+.route-stats{
+  background:white;
+  border-radius:14px;
+  padding:14px;
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+  font-size:14px;
+}
+.stat-value{font-size:16px;font-weight:600;}
+
+/* SETTINGS GEAR */
+#settingsGear{
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  background:white;
+  border-radius:50%;
+  width:50px;
+  height:50px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  box-shadow:0 6px 16px rgba(0,0,0,0.2);
+  cursor:pointer;
+  font-size:24px;
+  color:var(--blue-dark);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.3s, transform 0.2s;
+  z-index:20;
+}
+#settingsGear:hover{transform:rotate(15deg);}
+#hoverCorner{position:fixed;bottom:0;left:0;width:80px;height:80px;z-index:5;}
+#hoverCorner:hover + #settingsGear{opacity:1;pointer-events:auto;}
+
+/* POPUP OVERLAY */
+.popupOverlay{
+  position:fixed;
+  top:0;left:0;width:100%;height:100%;
+  backdrop-filter:blur(6px);
+  background:rgba(0,0,0,0.2);
+  display:none;
+  justify-content:center;
+  align-items:flex-start;
+  padding-top:40px;
+  z-index:15;
+}
+
+/* POPUP CONTENT */
+.popupContent{
+  background:var(--card-bg);
+  border-radius:20px;
+  width:800px;
+  max-height:80%;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+  padding:50px 30px 30px 30px;
+  box-shadow:0 8px 30px rgba(0,0,0,0.25);
+  position:relative;
+  overflow-y:auto;
+}
+.popupContent h2{text-align:center;margin:0;font-size:20px;font-weight:600;color:var(--blue-dark);}
+
+/* ROUTINE CARDS */
+.routine-card{
+  background:var(--card-bg);
+  border-radius:16px;
+  padding:16px 20px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 4px 12px rgba(0,0,0,0.12);
+  transition:all 0.2s;
+}
+.routine-card:hover{transform:translateY(-2px);}
+.routine-text{font-size:16px;font-weight:500;color:#1e2a33;}
+.deleteBtn{
+  background:var(--blue);border:none;color:white;border-radius:8px;width:32px;height:32px;
+  font-size:18px;cursor:pointer;display:flex;justify-content:center;align-items:center;transition:all 0.2s;
+}
+.deleteBtn:hover{background:var(--blue-dark);}
+#addRoutineBtn{margin-top:10px;background:var(--blue);color:white;border:none;font-size:24px;font-weight:bold;border-radius:16px;width:60px;height:60px;cursor:pointer;align-self:center;transition:all 0.2s;}
+#addRoutineBtn:hover{background:var(--blue-dark);}
+</style>
+</head>
+<body>
+
+<header>
+  <div>Daily Dashboard</div>
+  <div id="clockHeader"></div>
+</header>
+
+<div class="container">
+  <!-- LEFT -->
+  <div class="widgets">
+    <div class="card">
+      <div class="small-title">Uhrzeit</div>
+      <div class="clock" id="clock"></div>
+      <div class="date" id="date"></div>
+      <div class="alarm">Wecker: 07:00</div>
+    </div>
+    <div class="card">
+      <div class="small-title">Wetter</div>
+      <div class="weather" id="weather">lädt...</div>
+    </div>
+    <div class="card">
+      <div class="small-title">Termine</div>
+      <div>09:00 Meeting<br>12:00 Lunch<br>15:00 Projekt Review</div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="route-section">
+    <div class="route-card">
+      <div class="route-title">Route B7 Express</div>
+      <div class="route-line"></div>
+      <div class="stop"><div class="stop-left">City Center<br>08:00</div><div class="dot"></div><div class="stop-right">Start</div></div>
+      <div class="stop"><div class="stop-left">Financial District<br>08:15</div><div class="dot"></div><div class="stop-right">Bus B7</div></div>
+      <div class="stop"><div class="stop-left"></div><div class="transfer">Umstieg<br>B12</div><div class="stop-right">Central Hub</div></div>
+      <div class="stop"><div class="stop-left">University<br>08:45</div><div class="dot"></div><div class="stop-right">Tram</div></div>
+      <div class="stop"><div class="stop-left">Campus<br>09:00</div><div class="dot"></div><div class="stop-right">Ziel</div></div>
+    </div>
+    <div class="route-stats">
+      <div><div>Fahrzeit</div><div class="stat-value">1h</div></div>
+      <div><div>Umstiege</div><div class="stat-value">1</div></div>
+      <div><div>Ankunft</div><div class="stat-value">09:00</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="hoverCorner"></div>
+<div id="settingsGear" title="Einstellungen öffnen">&#9881;</div>
+
+<!-- ROUTINEN ÜBERSICHT POPUP -->
+<div id="routinePopup" class="popupOverlay">
+  <div class="popupContent">
+    <h2>Routinen Übersicht</h2>
+    <div id="routineContainer">
+      <div class="routine-card"><div class="routine-text">Schule 06:00</div><button class="deleteBtn">&#128465;</button></div>
+      <div class="routine-card"><div class="routine-text">Arbeit 08:30</div><button class="deleteBtn">&#128465;</button></div>
+      <div class="routine-card"><div class="routine-text">Fitness 18:00</div><button class="deleteBtn">&#128465;</button></div>
+    </div>
+    <button id="addRoutineBtn">+</button>
+  </div>
+</div>
+
+<!-- ROUTINE CONFIG POPUP -->
+<div id="configPopup" class="popupOverlay">
+  <div class="popupContent">
+    <h2>Routine konfigurieren</h2>
+    <div style="text-align:center;color:#666;">Hier wird das Konfigurationslayout angezeigt</div>
+  </div>
+</div>
+
+<script>
+// CLOCK
+function updateClock(){
+  const now=new Date();
+  document.getElementById("clock").textContent=now.toLocaleTimeString("de-AT",{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById("clockHeader").textContent=now.toLocaleTimeString("de-AT",{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById("date").textContent=now.toLocaleDateString("de-AT",{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+}
+setInterval(updateClock,1000);
+updateClock();
+
+// WEATHER MOCK
+document.getElementById("weather").textContent="12°C, leicht bewölkt";
+
+// SETTINGS POPUP
+const settingsGear = document.getElementById("settingsGear");
+const routinePopup = document.getElementById("routinePopup");
+const configPopup = document.getElementById("configPopup");
+const routineContainer = document.getElementById("routineContainer");
+const addRoutineBtn = document.getElementById("addRoutineBtn");
+
+settingsGear.addEventListener("click", ()=>{routinePopup.style.display="flex";});
+[routinePopup, configPopup].forEach(popup=>{
+  popup.addEventListener("click",(e)=>{if(e.target===popup) popup.style.display="none";});
+});
+
+// DELETE ROUTINE
+routineContainer.addEventListener("click",(e)=>{
+  if(e.target.classList.contains("deleteBtn")){
+    e.target.closest(".routine-card").remove();
+  }
+});
+
+// PLUS -> CONFIG POPUP
+addRoutineBtn.addEventListener("click", ()=>{
+  routinePopup.style.display="none";
+  configPopup.style.display="flex";
+});
+</script>
+
+</body>
+</html>
