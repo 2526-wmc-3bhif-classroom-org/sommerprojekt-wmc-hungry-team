@@ -1,7 +1,5 @@
 import pool from '../config/db';
 
-//
-
 export const getUpcomingStops = async (stopId: string) => {
     const query = `
         SELECT r.route_short_name,
