@@ -1,4 +1,3 @@
-// @ts-ignore
 import express, { Request, Response } from "express";
 import { getUpcomingStops } from "../repo/bus-repo.js";
 

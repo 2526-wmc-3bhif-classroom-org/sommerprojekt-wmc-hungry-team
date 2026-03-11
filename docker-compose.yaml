@@ -3,14 +3,46 @@ services:
     image: postgis/postgis:16-3.4-alpine
     container_name: gtfs_db
     environment:
-      - POSTGRES_USER=transit_user
-      - POSTGRES_PASSWORD=your_secure_password
-      - POSTGRES_DB=gtfs_data
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./data:/gtfs_raw  # Mounts your GTFS files into the container
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  loader:
+    image: node:20-alpine
+    container_name: gtfs_loader
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - ./data:/data
+
+    environment:
+      PGHOST: ${DB_HOST}
+      PGPORT: ${DB_PORT}
+      PGUSER: ${DB_USER}
+      PGPASSWORD: ${DB_PASSWORD}
+      PGDATABASE: ${DB_NAME}
+
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache unzip postgresql-client &&
+        npm install -g gtfs-via-postgres &&
+        mkdir /gtfs &&
+        unzip /data/LINZ_AG_GTFS_2026.zip -d /gtfs &&
+        sed -i 's/,"DE",/,"de",/g' /gtfs/feed_info.txt &&
+        sh -c "gtfs-to-sql /gtfs/*.txt | psql -v ON_ERROR_STOP=1"
 
 volumes:
   postgres_data:
