@@ -1,5 +1,0 @@
-{
-  "dependencies": {
-    "gtfs-via-postgres": "^4.11.1"
-  }
-}
