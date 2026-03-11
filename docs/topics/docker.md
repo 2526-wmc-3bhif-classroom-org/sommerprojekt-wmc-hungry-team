@@ -4,3 +4,57 @@
 
 The DB will have its own container to make it easier to move it elsewhere later, since the smarthub is designed in a way to run on small, resource limited environments where a full db just doesn't have enough space.
 
+## Docker compose file
+
+```dockerfile
+services:
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: gtfs_db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  loader:
+    image: node:20-alpine
+    container_name: gtfs_loader
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - ./data:/data
+
+    environment:
+      PGHOST: ${DB_HOST}
+      PGPORT: ${DB_PORT}
+      PGUSER: ${DB_USER}
+      PGPASSWORD: ${DB_PASSWORD}
+      PGDATABASE: ${DB_NAME}
+
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache unzip postgresql-client &&
+        npm install -g gtfs-via-postgres &&
+        mkdir /gtfs &&
+        unzip /data/LINZ_AG_GTFS_2026.zip -d /gtfs &&
+        sed -i 's/,"DE",/,"de",/g' /gtfs/feed_info.txt &&
+        sh -c "gtfs-to-sql /gtfs/*.txt | psql -v ON_ERROR_STOP=1"
+
+volumes:
+  postgres_data:
+```
+
+There are 2 services, the actual db and the loader that imports the data from a given gtfs dataset.
