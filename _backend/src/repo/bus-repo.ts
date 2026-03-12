@@ -8,6 +8,25 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT || '5432'),
 });
 
+export const testConnection = async () => {
+
+  console.log('Running test connection...');
+  console.log('host' + process.env.DB_HOST);
+  console.log('user' + process.env.DB_USER);
+  console.log('passw' + process.env.DB_PASSWORD);
+  console.log('name' + process.env.DB_NAME);
+
+  const query = `SELECT * FROM agency`;
+
+  try {
+    const res = await pool.query(query);
+    return res.rows;
+  } catch (err) {
+    console.error('Database query error:', err);
+    throw err;
+  }
+}
+
 export const getUpcomingStops = async (stopId: string) => {
   const query = `
         SELECT r.route_short_name,
