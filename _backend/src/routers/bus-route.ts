@@ -1,17 +1,30 @@
-import express, { Request, Response } from "express";
-import { getUpcomingStops } from "../repo/bus-repo.js";
+import { Router, Request, Response } from 'express';
+import { getUpcomingStops } from '../repo/bus-repo.js';
 
-const app = express();
-app.use(express.json());
+const router = Router();
 
-app.get('/api/bus:stopId', (req: Request, res: Response) => {
+router.get('/api/bus/:stopId', async (req: Request, res: Response) => {
   try {
-    const a = getUpcomingStops(<string>req.params.stopId);
-    a ? res.json(a) : res.sendStatus(404);
-  }
-  catch (e) {
-    res.status(500).json({ error: String(e) });
+    let stopId = req.params.stopId;
+
+    if (!stopId || !/^[a-zA-Z0-9_-]+$/.test(stopId)) {
+      return res.status(400).json({ error: 'Invalid stop ID' });
+    }
+    if (stopId.length > 64) {
+      return res.status(400).json({ error: 'Stop ID too long' });
+    }
+
+    const upcoming = await getUpcomingStops(stopId);
+
+    if (upcoming.length > 0) {
+      res.json(upcoming);
+    } else {
+      res.sendStatus(404);
+    }
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.listen(3000);
+export default router;
