@@ -1,0 +1,8 @@
+GET http://localhost:3000/api/bus/route?lon_a=14.28&lat_a=48.30&lon_b=14.32&lat_b=48.25&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+###
+GET localhost:3000/api/bus/test
+
+###
+GET http://localhost:3000/api/bus/route?lon_a=14.27502937&lat_a=48.29107692&lon_b=14.26712419&lat_b=48.30039407&departure_time=08:30:00&max_transfers=2
