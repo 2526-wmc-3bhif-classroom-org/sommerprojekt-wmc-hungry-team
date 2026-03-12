@@ -1,5 +1,9 @@
 import express from 'express';
 import busRouter from './routers/bus-route.js';
+// @ts-ignore
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '../../.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
