@@ -187,7 +187,7 @@ export const getRouteByCoords = async (lon_a: number, lat_a: number, lon_b: numb
       LPAD(EXTRACT(MINUTE FROM transfer_arrival_time)::text, 2, '0') || ':' ||
       LPAD(FLOOR(EXTRACT(SECOND FROM transfer_arrival_time))::int::text, 2, '0') AS transfer_arrival_time
     FROM completed_journeys
-    ORDER BY legs ASC, total_duration ASC, dep_time ASC
+    ORDER BY legs ASC, total_duration ASC, departure_time ASC
       LIMIT 5;
   `;
 
