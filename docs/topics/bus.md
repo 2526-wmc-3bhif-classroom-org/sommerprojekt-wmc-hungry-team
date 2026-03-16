@@ -18,4 +18,4 @@ GET http://localhost:3000/api/bus/route?lon_a=14.27502937&lat_a=48.29107692&lon_
 
 The coordinates of the **start point** as well as the **end point** need to be provided as well as the **departure time** and **max number of transfers**.
 
-The Coordinates will be determent through **Google Places Autocomplete API** or optionally though manual input.
+The Coordinates will be determent through [**Google Places Autocomplete API**](./google.md) or optionally though manual input.
