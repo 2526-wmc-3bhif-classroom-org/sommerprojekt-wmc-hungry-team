@@ -1,0 +1,369 @@
+Based on the documentation and codebase analysis, here's what I know about the weather service
+  implementation:
+
+  Requirements
+
+  API: OpenMeteo (free weather forecast API) Storage: SQLite database (local storage for forecast
+  data) Display: WeatherWidget.vue component (already scaffolded in frontend)
+
+  Current State
+
+   - Frontend: WeatherWidget.vue component exists but is empty
+   - Backend: Need to create weather router and repository layer
+   - Database: No SQLite setup yet
+
+  Architecture Pattern to Follow
+
+  Following your existing bus routing pattern:
+
+   _backend/src/
+   ├── routers/weather.ts        # HTTP endpoints for weather
+   └── repo/weather-repo.ts      # SQLite queries + OpenMeteo fetching
+
+  Key Questions
+
+   1. Data freshness: How often should we fetch/refresh weather data from OpenMeteo?
+   2. Location handling: Should users configure multiple locations, or just one? How do they specify 
+  locations (coordinates, city names)?
+   3. Forecast scope: How many days ahead? Hourly or daily forecasts?
+   4. SQLite location: Should the SQLite file be in _backend/ or at project root?
+
+  Would you like me to:
+
+   - Create a plan for the weather service implementation (recommended for multi-step features)
+   - Start implementing right away if you have clear answers to the questions above
+
+
+1. The fetching will happen at the beginning of a routine. 
+2. Users will be able to select the weather widget at configuration of a routine, then they will be required to input a place which will the be converted to concrete coordinates via the google places api which will also be used for the same purpose in the bus routing widget.
+3. The weather will be provided at 2 hour intervals for the day, it will also showcase wind, if its sunny, the "feels like" weather and other additional information (snow, ice, heat, ..).
+4. Were ditching the SQLite db, the idea was to save the weather data for analytics but that will no longer be required since it is out of scope for this project. Instead the weather will be fetched once at the beginning of a routine and then saved temp.
+
+- You will now create a detailed plan for the implementation of the weather service. Create a new file in data/topics called weather.md in which you will document the endpoint and describe how to use it. If anything is unclear or conflicting, ask, don't assume anything.
+
+
+I need to clarify a few things before creating the detailed plan:
+
+○ Asking user When you say weather data is "saved temp" after fetching ...
+
+╭ When you say weather data is "saved temp" after fetching - where exactly should it be stored? In-memory cac…╮
+│ ❯ 1. Backend in-memory cache (NodeJS variable)                                                              │
+│   2. Frontend Pinia store                                                                                   │
+│   3. Both - backend caches, frontend stores for display                                                     │
+│   4. Session storage in browser                                                                             │
+│   5. Other (type your answer)
+
+
+
+The data will be saved in the frontend although we are going to switch to a Nuxt frontend, but for now we will store it in a temporary pinia store.
+
+
+
+ Asking user Should the weather API endpoint accept place names direct...
+
+╭ Should the weather API endpoint accept place names directly and handle Google Places lookup internally, or …╮
+│ ❯ 1. Single endpoint that accepts place name and returns weather                                            │
+│   2. Two endpoints: one for place→coordinates, one for weather by coordinates                               │
+│   3. Single endpoint that accepts either place name OR coordinates                                          │
+│   4. Other (type your answer)
+
+
+The endpoint will ONLY accept coordinates since it's job is only to communicate with the [openMeteor api](https://open-meteo.com/en/docs) which needs coordinates. The place to coords will be handled seperatly by a different endpoint since the bus endpoint also only accepts coords.
+
+
+
+For "2-hour intervals for the day" - should this be the current calendar day, next 24 hours from now, or something else? ────╮
+│ ❯ 1. Current calendar day (00:00 to 23:59 today)                                                                             │
+│   2. Next 24 hours from now                                                                                                  │
+│   3. Rest of today + tonight (until midnight)                                                                                │
+│   4. Configurable hours ahead                                                                                                │
+│   5. Other (type your answer)
+
+
+Option 3
+
+
+You mentioned Google Places API for place name to coordinates conversion. Should this be a shared backend endpoint used by b…╮
+│ ❯ 1. Same place lookup endpoint for both weather and bus widgets                                                             │
+│   2. Separate endpoints (one for weather, one for bus)                                                                       │
+│   3. Not needed - frontend already handles this                                                                              │
+│   4. Other (type your answer)
+
+
+Option 1
+
+
+
+● Excellent! I've created a comprehensive plan for the weather service implementation. Here's what I've delivered:
+
+  📄 Documentation Created
+
+  1. data/topics/weather.md - Complete API Documentation
+
+   - Endpoint specifications (GET /api/weather/forecast)
+   - Request/response formats with all fields explained
+   - WMO weather codes table
+   - OpenMeteo API integration details
+   - Frontend Pinia store structure
+   - Related Places API endpoint documentation
+   - Environment variables needed
+
+  2. plan.md - Implementation Plan
+
+   - 5-phase implementation strategy
+   - Architecture overview (backend routers + repos)
+   - Complete data flow diagram
+   - Dependencies and environment setup
+   - Testing checklist
+   - Edge cases and error handling
+
+  3. SQL Todo Tracking - 10 todos with dependencies
+
+   - ✅ 3 todos ready to start (no blockers):
+    - weather-repo - OpenMeteo API integration
+    - places-repo - Google Places geocoding
+    - weather-store - Pinia store setup
+
+  🎯 Key Design Decisions
+
+  ✅ Coordinates only - Weather endpoint accepts lat/lon (not place names)
+  ✅ Shared geocoding - Separate /api/places/geocode endpoint for both weather & bus widgets
+  ✅ 2-hour intervals - Filter hourly data to every 2 hours (00:00, 02:00, 04:00...)
+  ✅ Day boundary - Only show forecasts from now until 23:59 today
+  ✅ No persistence - Weather stored temporarily in frontend Pinia store
+  ✅ OpenMeteo free tier - No API key required, ~10k requests/day limit
+
+  📋 Implementation Order
+
+  The todos are structured with dependencies, so you'll naturally progress:
+
+   1. Backend repos (weather-repo + places-repo) - Can be done in parallel
+   2. Backend routers (weather-router + places-router) - Depend on repos
+   3. Mount routers in app.ts
+   4. Frontend store (weather-store) - Independent of backend
+   5. Widget update (WeatherWidget.vue) - Depends on store
+   6. Testing - Depends on everything
+
+  Would you like me to start implementing, or do you have any questions or adjustments to the plan?
+
+
+❯ How did you understand the enpoint for google places, explain it to me in detail
+
+
+
+My Understanding & Assumptions
+
+  What you told me:
+
+   1. "Place name will be converted to concrete coordinates via the google places api"
+   2. This will be used for both weather widget AND bus routing widget
+   3. The endpoint should ONLY accept coordinates (not place names)
+   4. Place-to-coordinates conversion happens separately by a different endpoint
+
+  What I assumed: I chose the Google Geocoding API (part of the Google Maps Platform) because:
+
+  API Choice: Geocoding API vs Places API
+
+  There are actually 3 different Google APIs that could work:
+
+  1. Geocoding API ← What I documented
+
+   Endpoint: https://maps.googleapis.com/maps/api/geocode/json
+   Parameters: ?address=Linz, Austria&key=YOUR_API_KEY
+   
+   Response:
+   {
+     "results": [{
+       "formatted_address": "Linz, Upper Austria, Austria",
+       "geometry": {
+         "location": {
+           "lat": 48.3069,
+           "lng": 14.2858
+         }
+       }
+     }]
+   }
+
+  ✅ Pros: Simple, directly converts address → coordinates, cheaper
+  ❌ Cons: No autocomplete, no place details
+
+  2. Places API - Text Search
+
+   Endpoint: https://maps.googleapis.com/maps/api/place/textsearch/json
+   Parameters: ?query=Linz, Austria&key=YOUR_API_KEY
+   
+   Response includes: place_id, name, formatted_address, geometry, types
+
+  ✅ Pros: More place details, can search businesses/POIs
+  ❌ Cons: More expensive, returns extra data we don't need
+
+  3. Places API - Autocomplete (Most feature-rich)
+
+   Endpoint: https://maps.googleapis.com/maps/api/place/autocomplete/json
+   Parameters: ?input=Linz&key=YOUR_API_KEY
+   
+   Then fetch details:
+   https://maps.googleapis.com/maps/api/place/details/json?place_id=...&key=YOUR_API_KEY
+
+  ✅ Pros: Best UX (dropdown suggestions as user types), most accurate
+  ❌ Cons: Requires 2 API calls, most expensive, complex to implement
+
+  Questions for You:
+
+○ Asking user Which Google API did you want to use for converting place...
+
+╭ Which Google API did you want to use for converting place names to coordinates? The Geocoding API is simplest and cheapest, but Places Autocomplete gives the best user experience with dropdown suggestions. ──╮
+│ ❯ 1. Geocoding API (simple address → coordinates)                                                                                                                                                               │
+│   2. Places Text Search (more comprehensive search)                                                                                                                                                             │
+│   3. Places Autocomplete (dropdown suggestions as user types)                                                                                                                                                   │
+│   4. I don't know yet / need to research                                                                                                                                                                        │
+│   5. Other (type your answer)
+
+
+
+I want to use the first option, Geocoding API, I do prefer speed and performance since it will be running on a rasperry pi.
+
+
+
+Google Geocoding API - Detailed Explanation
+
+  API Endpoint
+
+   https://maps.googleapis.com/maps/api/geocode/json
+
+  Request Format
+
+   GET https://maps.googleapis.com/maps/api/geocode/json?address={place_name}&key={GOOGLE_KEY}
+
+  Parameters:
+
+   - address (required): The place name/address to geocode (e.g., "Linz, Austria", "Hauptplatz 1, 4020 Linz")
+   - key (required): Your Google API key from .env file
+   - Optional: region (e.g., "at" for Austria) - biases results to that country
+   - Optional: language (e.g., "de" for German) - response language
+
+  Response Example
+
+  Request:
+
+   GET https://maps.googleapis.com/maps/api/geocode/json?address=Linz,%20Austria&key=YOUR_KEY
+
+  Response:
+
+   {
+     "results": [
+       {
+         "address_components": [
+           {
+             "long_name": "Linz",
+             "short_name": "Linz",
+             "types": ["locality", "political"]
+           },
+           {
+             "long_name": "Upper Austria",
+             "short_name": "Upper Austria",
+             "types": ["administrative_area_level_1", "political"]
+           },
+           {
+             "long_name": "Austria",
+             "short_name": "AT",
+             "types": ["country", "political"]
+           }
+         ],
+         "formatted_address": "Linz, Austria",
+         "geometry": {
+           "location": {
+             "lat": 48.3069,
+             "lng": 14.2858
+           },
+           "location_type": "APPROXIMATE",
+           "viewport": {
+             "northeast": { "lat": 48.3556, "lng": 14.3711 },
+             "southwest": { "lat": 48.2189, "lng": 14.2069 }
+           }
+         },
+         "place_id": "ChIJm4B6TS0ddUcRIAA3pKAR-nE",
+         "types": ["locality", "political"]
+       }
+     ],
+     "status": "OK"
+   }
+
+  What We Extract
+
+  From the response, we need:
+
+   1. results[0].geometry.location.lat → Latitude
+   2. results[0].geometry.location.lng → Longitude (note: "lng", not "lon")
+   3. results[0].formatted_address → Nice display name
+
+  Status Codes
+
+  The API returns a status field:
+
+   - "OK" - Success, at least one result found
+   - "ZERO_RESULTS" - No results (invalid/unknown place)
+   - "OVER_QUERY_LIMIT" - You exceeded your quota
+   - "REQUEST_DENIED" - Invalid API key or API not enabled
+   - "INVALID_REQUEST" - Missing required parameters
+   - "UNKNOWN_ERROR" - Server error, retry may work
+
+  Our Backend Implementation
+
+   // _backend/src/repo/places-repo.ts
+   export async function geocodePlace(placeName: string) {
+     const apiKey = process.env.GOOGLE_KEY;
+     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(placeName)}&key=${apiKey}`;
+     
+     const response = await fetch(url);
+     const data = await response.json();
+     
+     if (data.status !== 'OK') {
+       throw new Error(`Geocoding failed: ${data.status}`);
+     }
+     
+     const result = data.results[0];
+     return {
+       place: placeName,
+       formattedAddress: result.formatted_address,
+       coordinates: {
+         lat: result.geometry.location.lat,
+         lon: result.geometry.location.lng  // Convert "lng" to "lon" for consistency
+       }
+     };
+   }
+
+  Our API Endpoint
+
+   GET /api/places/geocode?place=Linz, Austria
+   
+   Response:
+   {
+     "place": "Linz, Austria",
+     "formattedAddress": "Linz, Austria",
+     "coordinates": {
+       "lat": 48.3069,
+       "lon": 14.2858
+     }
+   }
+
+  Cost & Quotas
+
+   - Price: $5.00 per 1,000 requests (after $200 free credit monthly)
+   - Free tier: First 40,000 requests/month free (= $200 credit)
+   - Rate limit: 50 requests/second
+   - Perfect for Raspberry Pi: Low latency (~100-300ms), minimal bandwidth
+
+  Why This Works for You
+
+  ✅ Simple: One API call, get coordinates immediately
+  ✅ Fast: Single HTTP request (200ms average)
+  ✅ Cheap: 40k free requests/month is more than enough
+  ✅ Lightweight: Small response payload (2KB)
+  ✅ Raspberry Pi friendly: Minimal processing required 
+
+  Does this explanation make sense? This is exactly what I documented in the weather.md file.
+  
+  
+  
+ 
