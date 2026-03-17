@@ -6,3 +6,7 @@
   <h1>Dashboard</h1>
   <p>Some stuff</p>
 </template>
+
+<style>
+
+</style>
