@@ -3,6 +3,8 @@ dotenv.config({ path: '../.env' });
 
 import express from 'express';
 import busRouter from './routers/bus-route.js';
+import weatherRouter from './routers/weather.js';
+import placesRouter from './routers/places.js';
 
 console.log('env check...');
 console.log('host: ' + process.env.DB_HOST);
@@ -17,6 +19,8 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.use(busRouter);
+app.use(weatherRouter);
+app.use(placesRouter);
 
 process.on('SIGINT', async () => {
     console.log('Shutting down...');
