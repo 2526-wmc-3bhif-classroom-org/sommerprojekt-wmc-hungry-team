@@ -1,3 +1,4 @@
+// @ts-ignore
 import https from 'https';
 
 // Helper function to fetch JSON from HTTPS URL
