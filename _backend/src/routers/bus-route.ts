@@ -3,6 +3,8 @@ import {getRouteByCoords, testConnection} from '../repo/bus-repo';
 
 const router = Router();
 
+console.log('bus router loaded');
+
 router.get('/api/bus/test', async (req: Request, res: Response) => {
     try {
         const upcoming = await testConnection();
