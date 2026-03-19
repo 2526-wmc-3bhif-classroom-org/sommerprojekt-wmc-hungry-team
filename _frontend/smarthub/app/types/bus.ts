@@ -84,11 +84,11 @@ export function formatTime(time: string): string {
 
 // Helper function to format duration from HH:MM:SS to readable format
 export function formatDuration(duration: string): string {
-  const parts = duration.split(':');
-  if (parts.length < 2) return duration;
+  const [hourStr, minuteStr] = duration.split(':');
+  if (!hourStr || !minuteStr) return duration;
 
-  const hours = parseInt(parts[0]);
-  const minutes = parseInt(parts[1]);
+  const hours = parseInt(hourStr, 10);
+  const minutes = parseInt(minuteStr, 10);
 
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
