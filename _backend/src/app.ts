@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '../.env' });
 
 import express from 'express';
+import cors from 'cors';
 import busRouter from './routers/bus-route.js';
 import weatherRouter from './routers/weather.js';
 import placesRouter from './routers/places.js';
@@ -16,6 +17,10 @@ console.log('name: ' + process.env.DB_NAME);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(cors({
+    origin: /^http:\/\/localhost:\d+$/,
+    methods: ['GET'],
+}));
 app.use(express.json());
 
 app.use(busRouter);
