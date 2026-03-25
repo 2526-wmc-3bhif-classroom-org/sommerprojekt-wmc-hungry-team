@@ -296,44 +296,59 @@ Frontend requires Node 20.19.0 or ≥22.12.0 (from `package.json` engines field)
 
 ## Development Session Notes
 
-### Session 2026-03-17: Weather Service Implementation
+### Session 2026-03-25: Neo4j Route Finding Migration
 
-**Objective**: Implement weather forecast and geocoding services for the SmartHub dashboard.
+**Objective**: Replace PostgreSQL routing with Neo4j graph database for better performance and correctness.
 
-**Key Decisions Made**:
-1. **No SQLite**: Cancelled plan to cache weather in SQLite. Weather fetched fresh at routine start and cached temporarily in frontend.
-2. **Coordinate-only endpoints**: Weather endpoint accepts only lat/lon (not place names). Separate geocoding endpoint for place → coordinates conversion.
-3. **Vienna timezone**: Hardcoded `Europe/Vienna` timezone constant for all weather requests (acceptable since project focuses on Austrian transit).
-4. **2-hour intervals**: Weather shows every 2 hours from now until midnight (rest of current day in Vienna time).
-5. **Shared geocoding**: Single `/api/places/geocode` endpoint used by both weather and bus routing widgets.
-6. **No external HTTP library**: Used Node.js built-in `https` module for Raspberry Pi performance (no axios/fetch dependency).
+**Issues with PostgreSQL Implementation**:
+- Only supports 2 transfer levels despite claiming 5
+- Incorrect JOIN logic missing valid transfer scenarios
+- No actual stop connectivity validation
+- Fragile calendar handling (string comparison on day names)
+- Performance degrades exponentially with transfers
+- Doesn't find shortest/best paths reliably
+
+**Solution: Neo4j Graph Database**:
+- Native shortest-path algorithms (Dijkstra, A*)
+- Explicit modeling of transit network as graph
+- Path finding is O(hops) not O(data size)
+- Support unlimited transfers with consistent performance
+- Simpler, more maintainable code
 
 **Implementation Approach**:
-- Followed existing router → repo layering pattern from bus routing
-- Created comprehensive API documentation in `docs/topics/weather.md`
-- Created detailed implementation thought process in `.github/weather-endpoint-implementation.md`
-- Used SQL todo tracking with dependencies for phased implementation
-- Tested all endpoints with curl (valid inputs, invalid inputs, error cases)
+- Parallel setup: Both databases running for testing
+- Neo4j as primary, PostgreSQL as fallback
+- Automatic fallback if Neo4j fails
+- `?use_postgres=true` query param for explicit testing
+- Response header `X-Route-Backend` shows which backend was used
 
 **Files Created**:
-- Backend: `weather-repo.ts`, `places-repo.ts`, `weather.ts` (router), `places.ts` (router)
-- Frontend: `stores/weather.ts` (Pinia store)
-- Documentation: `docs/topics/weather.md`, `.github/weather-endpoint-implementation.md`
+- `docker-compose.yaml` - Added Neo4j service + loader
+- `scripts/load-gtfs-neo4j.js` - GTFS data import script
+- `_backend/src/repo/neo4j-driver.ts` - Connection pooling
+- `_backend/src/repo/bus-repo-neo4j.ts` - Routing algorithms
+- `_backend/package.json` - Added neo4j dependency
+- `docs/topics/neo4j-routing.md` - Complete implementation guide
 
-**Testing Results**:
-- ✅ OpenMeteo API integration working (2-hour intervals, day boundary filtering)
-- ✅ Google Geocoding API working (place names → coordinates)
-- ✅ Error handling validated (400, 404, 500, 503 status codes)
-- ✅ Integration flow verified (places → weather)
-- ✅ Weather codes mapped correctly to descriptions
-- ✅ Condition flags calculate properly (snow, rain, ice, sunny, cloudy)
+**Testing Results** (to be completed):
+- [ ] Route quality comparison (Neo4j vs PostgreSQL)
+- [ ] Performance benchmarking (target: 100-500ms vs 2-5s)
+- [ ] Multi-transfer path finding (up to 5 transfers)
+- [ ] Error handling and fallback mechanisms
 
-**Deferred**:
-- Frontend WeatherWidget.vue implementation (waiting for Nuxt migration)
-- Widget will use existing Pinia store for data fetching and display
+**Status**:
+- ✅ Docker setup with both databases
+- ✅ Neo4j GTFS data loader created
+- ✅ Routing algorithm implemented
+- ✅ Backend integration with fallback
+- ⏳ Pending: Testing and validation (Week 1)
+- ⏳ Pending: PostgreSQL removal (Week 2+)
 
-**Lessons Learned**:
-- Clarifying requirements upfront (timezone handling, SQLite decision) saved implementation time
-- Documenting thought process helps future developers understand design choices
-- Following existing patterns (router/repo structure) maintains codebase consistency
-- Using built-in Node.js modules reduces dependencies for embedded systems
+**Next Steps**:
+1. Start Docker containers
+2. Verify GTFS data loads into Neo4j
+3. Run comparison tests (Neo4j vs PostgreSQL)
+4. Benchmark performance improvements
+5. Fix any bugs found during testing
+6. Document test results
+7. Schedule PostgreSQL removal after successful validation
