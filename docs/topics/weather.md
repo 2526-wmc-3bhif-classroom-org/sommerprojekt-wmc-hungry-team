@@ -284,9 +284,10 @@ GOOGLE_KEY=your_google_api_key_here  # Used for Places API
 
 ## Implementation Notes
 
-1. **No caching**: Weather data is fetched fresh at the start of each routine and stored temporarily in frontend Pinia store
+1. **Frontend Caching**: Weather data is fetched fresh at the start of each routine and cached temporarily in frontend Pinia store. Cache automatically expires at 00:00 Europe/Vienna (midnight).
 2. **Timezone handling**: Use location's local timezone for time display
 3. **Error handling**: Gracefully handle OpenMeteo API failures with user-friendly error messages
 4. **Rate limiting**: OpenMeteo allows ~10,000 requests/day on free tier
 5. **2-hour intervals**: Filter hourly data to show every 2 hours (00:00, 02:00, 04:00, etc.)
 6. **Day boundary**: Only show forecasts until 23:59 of current day in location's local time
+7. **Place Disambiguation**: When place name lookup returns multiple results, frontend presents all options to user for disambiguation
