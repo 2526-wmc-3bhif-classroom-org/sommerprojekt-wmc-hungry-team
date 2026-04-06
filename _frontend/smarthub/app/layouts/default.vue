@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-wrapper">
+  <div class="wrapper">
     <main class="content">
       <slot />
     </main>
@@ -7,7 +7,7 @@
 </template>
 
 <style scoped>
-.dashboard-wrapper {
+.wrapper {
   height: 100vh;
   background: #f4f6f8;
   font-family: 'Segoe UI', Arial, sans-serif;
@@ -17,9 +17,6 @@
 
 .content {
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1.5fr;
-  gap: 20px;
   padding: 24px;
   overflow: hidden;
 }
