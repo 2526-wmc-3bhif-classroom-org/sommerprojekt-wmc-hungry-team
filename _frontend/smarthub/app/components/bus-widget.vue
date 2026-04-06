@@ -8,7 +8,7 @@ interface Stop {
 
 const routeStops: Stop[] = [
   { name: 'Linz/Donau Jäger im Tal', time: '07:45', isTransfer: false },
-  { name: 'Linz/Donau Hbf', time: '08:02', isTransfer: true, transferInfo: '→ Linie 230' },
+  { name: 'Linz/Donau Hbf', time: '08:02', isTransfer: true, transferInfo: 'Linie 230' },
   { name: 'Rohrbach B138 B127', time: '08:18', isTransfer: false },
   { name: 'Rohrbach B127 Wambacherberg', time: '08:30', isTransfer: false },
 ]
@@ -36,8 +36,9 @@ const arrivalTime = '08:30'
         ></div>
         <div class="bus-widget__stop-info">
           <div class="bus-widget__stop-name">{{ stop.name }}</div>
-          <div v-if="stop.isTransfer && stop.transferInfo" class="bus-widget__stop-transfer">
-            {{ stop.transferInfo }}
+          <div v-if="stop.isTransfer && stop.transferInfo" class="bus-widget__stop-transfer-wrapper">
+            <span class="bus-widget__stop-transfer-badge">Umstieg</span>
+            <span class="bus-widget__stop-transfer">{{ stop.transferInfo }}</span>
           </div>
         </div>
         <div class="bus-widget__stop-time">{{ stop.time }}</div>
@@ -134,11 +135,28 @@ const arrivalTime = '08:30'
   color: #1f2937;
 }
 
+.bus-widget__stop-transfer-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.bus-widget__stop-transfer-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: #d97706;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .bus-widget__stop-transfer {
-  font-size: 0.8125rem;
-  color: #f59e0b;
-  font-weight: 500;
-  margin-top: 2px;
+  font-size: 0.875rem;
+  color: #1f2937;
+  font-weight: 600;
 }
 
 .bus-widget__stop-time {
