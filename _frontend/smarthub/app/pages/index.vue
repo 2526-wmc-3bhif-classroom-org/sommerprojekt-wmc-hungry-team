@@ -1,6 +1,7 @@
 <template>
   <div class="home">
     <h1>Welcome to the homepage</h1>
+    <h3>Still under construction</h3>
     <a href="/dashboard" class="home__link">go to /dashboard</a>
   </div>
 </template>
