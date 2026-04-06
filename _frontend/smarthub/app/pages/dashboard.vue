@@ -44,5 +44,7 @@
 .dashboard__right {
   width: 65%;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>

@@ -71,7 +71,8 @@ const arrivalTime = '08:30'
   display: flex;
   flex-direction: column;
   gap: 20px;
-
+  height: 100%;
+  min-height: 0;
 }
 
 .bus-widget__title {
