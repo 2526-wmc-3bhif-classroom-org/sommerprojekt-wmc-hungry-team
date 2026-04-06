@@ -1,6 +1,11 @@
+<script setup lang="ts">
+import ClockWidget from '~/components/ClockWidget.vue';
+
+</script>
+
 <template>
-  <div>
-    <h1>Welcome to the homepage</h1>
+  <div class="widgets">
+    <clock-widget />
+    <bus-widget />
   </div>
-  <bus-widget />
 </template>
