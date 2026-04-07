@@ -37,8 +37,7 @@ SmartHub runs on a Raspberry Pi connected to an LCD panel positioned over a nigh
 
 | Feature | Status |
 |---------|--------|
-| Bus routing (PostgreSQL) | ✅ Implemented |
-| Bus routing (Neo4j) | ✅ Implemented, testing |
+| Bus routing (Neo4j) | ✅ Implemented |
 | Weather forecasts | ✅ Implemented |
 | Places/Geocoding | ✅ Implemented |
 | Clock widget | ✅ Implemented |
@@ -63,8 +62,7 @@ SmartHub runs on a Raspberry Pi connected to an LCD panel positioned over a nigh
 - **Execution**: tsx (TypeScript execution)
 
 ### Databases
-- **PostgreSQL + PostGIS**: GTFS transit data (legacy routing)
-- **Neo4j 5**: Graph database for transit routing (primary)
+- **Neo4j 5**: Graph database for transit routing
 
 ### External APIs
 - **OpenMeteo**: Weather forecasts (free, no auth)
@@ -88,12 +86,14 @@ sommerprojekt-wmc-hungry-team/
 │   │   │   ├── bus-route.ts    # Transit routing endpoints
 │   │   │   ├── weather.ts      # Weather endpoints
 │   │   │   └── places.ts       # Geocoding endpoints
-│   │   └── repo/               # Data access layer
-│   │       ├── bus-repo.ts     # PostgreSQL routing
-│   │       ├── bus-repo-neo4j.ts # Neo4j routing
-│   │       ├── neo4j-driver.ts # Neo4j connection pool
-│   │       ├── weather-repo.ts # OpenMeteo integration
-│   │       └── places-repo.ts  # Google Geocoding
+│   │   ├── repo/               # Data access layer
+│   │   │   ├── bus-repo-neo4j.ts # Neo4j routing
+│   │   │   ├── neo4j-driver.ts # Neo4j connection pool
+│   │   │   ├── weather-repo.ts # OpenMeteo integration
+│   │   │   └── places-repo.ts  # Google Geocoding
+│   │   └── utils/              # Shared utilities
+│   │       ├── validation.ts   # Input validation helpers
+│   │       └── http.ts         # HTTP fetch utilities
 │   └── package.json
 │
 ├── _frontend/smarthub/          # Nuxt application
@@ -119,7 +119,7 @@ sommerprojekt-wmc-hungry-team/
 │   ├── topics/                 # Topic-specific docs
 │   └── ...
 │
-├── docker-compose.yaml          # Database services
+├── docker-compose.yaml          # Database services (Neo4j)
 ├── .env                         # Environment variables
 └── .env.example                 # Environment template
 ```
@@ -213,17 +213,6 @@ Response
 
 ### Connection Management
 
-**PostgreSQL** - Single connection pool:
-```typescript
-let pool: Pool | null = null;
-const getPool = (): Pool => {
-  if (!pool) {
-    pool = new Pool({ /* config from env */ });
-  }
-  return pool;
-};
-```
-
 **Neo4j** - Driver with session factory:
 ```typescript
 let driver: Driver | null = null;
@@ -234,6 +223,25 @@ export const getNeo4jDriver = () => {
   return driver;
 };
 export const getNeo4jSession = () => getNeo4jDriver().session({ database: 'neo4j' });
+```
+
+### Shared Utilities
+
+Common code is extracted into `src/utils/`:
+
+**validation.ts** - Input validation:
+```typescript
+import { parseCoordinates, parseCoordinatePair, validateTimeFormat } from '../utils/validation.js';
+
+const coords = parseCoordinates(lat, lon);
+if (!coords.valid) return res.status(400).json({ error: coords.error });
+```
+
+**http.ts** - HTTP client:
+```typescript
+import { fetchJson } from '../utils/http.js';
+
+const data = await fetchJson(url, 10000); // 10s timeout
 ```
 
 ---
@@ -294,24 +302,7 @@ export const useWeatherStore = defineStore('weather', {
 
 ## Database Systems
 
-### PostgreSQL + PostGIS (Legacy)
-
-**Purpose**: GTFS transit data storage, fallback routing
-
-**Schema** (standard GTFS):
-- `stops` - Transit stops with PostGIS POINT geometry
-- `routes` - Bus/tram/train lines
-- `trips` - Scheduled service runs
-- `stop_times` - Stop visit times per trip
-- `calendar` - Service day patterns
-- `agency` - Transit operators
-
-**Key Features**:
-- PostGIS for geospatial queries
-- SRID 4326 (WGS84) coordinates
-- Distance operator: `stop_loc <-> ST_MakePoint(lon, lat)`
-
-### Neo4j (Primary for Routing)
+### Neo4j (Transit Routing)
 
 **Purpose**: Graph-based transit routing with native path finding
 
@@ -332,22 +323,11 @@ export const useWeatherStore = defineStore('weather', {
 | NEXT_STOP | StopTime → StopTime | Consecutive stops on trip |
 | ON_ROUTE | Trip → Route | Trip belongs to route |
 | ON_SERVICE | Trip → Service | Trip runs on service |
-| TRANSFER | Stop → Stop | Transfer opportunity |
 
-**Advantages over PostgreSQL**:
-- Native shortest-path algorithms (Dijkstra)
-- O(hops) performance, not O(data size)
-- Unlimited transfer support
-- Simpler queries (Cypher vs complex SQL CTEs)
-
-### Dual Database Strategy
-
-The bus routing API uses Neo4j as primary with PostgreSQL fallback:
-
-1. Try Neo4j routing first
-2. If Neo4j fails → automatic fallback to PostgreSQL
-3. `?use_postgres=true` forces PostgreSQL (for testing)
-4. `X-Route-Backend` header shows which was used
+**Key Implementation Notes**:
+- GTFS times stored as strings (not Neo4j time type) to handle 24+ hour times
+- Stop matching uses name, not ID (handles multiple platforms at same station)
+- Batch processing in loader (50 trips/batch) to avoid memory issues
 
 ---
 
@@ -357,16 +337,15 @@ The bus routing API uses Neo4j as primary with PostgreSQL fallback:
 
 **GET /api/bus/test**
 
-Health check for database connections.
+Health check for Neo4j connection.
 
 Response:
 ```json
 {
   "status": "ok",
-  "backends": {
-    "neo4j": "up",
-    "postgresql": "up"
-  }
+  "backend": "neo4j",
+  "neo4j": "up",
+  "timestamp": "2026-04-07T12:00:00.000Z"
 }
 ```
 
@@ -382,7 +361,6 @@ Find transit routes between two points.
 | lon_b | number | Yes | End longitude |
 | departure_time | string | Yes | HH:MM:SS format |
 | max_transfers | number | Yes | 0-5 transfers allowed |
-| use_postgres | boolean | No | Force PostgreSQL backend |
 
 Response:
 ```json
@@ -396,14 +374,14 @@ Response:
     "boarded_at_stop_name": "Linz Hbf",
     "alight_at_stop_id": "...",
     "alight_at_stop_name": "Destination",
-    "route_short_name": "28",
-    "route_long_name": "Line 28",
-    "route_type": 3
+    "route_short_name": "3",
+    "route_long_name": "Tram 3",
+    "route_type": 0
   }
 ]
 ```
 
-Headers: `X-Route-Backend: neo4j` or `postgresql`
+Headers: `X-Route-Backend: neo4j`
 
 ### Weather
 
@@ -558,25 +536,11 @@ try {
 
 ### HTTP Client
 
-Use Node.js built-in `https` module (no axios/fetch for Raspberry Pi performance):
+Use shared utility from `src/utils/http.ts`:
 ```typescript
-import https from 'https';
+import { fetchJson } from '../utils/http.js';
 
-function fetchJson(url: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      let data = '';
-      res.on('data', (chunk) => data += chunk);
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          resolve(JSON.parse(data));
-        } else {
-          reject(new Error(`HTTP ${res.statusCode}`));
-        }
-      });
-    }).on('error', reject);
-  });
-}
+const data = await fetchJson(url, 10000); // timeout in ms
 ```
 
 ---
@@ -586,13 +550,6 @@ function fetchJson(url: string): Promise<any> {
 Create `.env` in project root:
 
 ```env
-# PostgreSQL (GTFS data)
-DB_USER=transit_admin
-DB_PASSWORD=admin
-DB_NAME=gtfs_data
-DB_HOST=localhost
-DB_PORT=5432
-
 # Neo4j (Graph routing)
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_secure_password
