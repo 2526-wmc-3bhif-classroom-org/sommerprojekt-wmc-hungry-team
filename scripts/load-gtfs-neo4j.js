@@ -40,6 +40,26 @@ function normalizeHeader(header) {
   return header.replace(/^\uFEFF/, '').trim();
 }
 
+/**
+ * Normalize GTFS time format (handles 24+ hour times)
+ * GTFS allows times like "24:30:00" meaning "00:30:00 next day"
+ * We store as string to preserve the original value for schedule logic
+ */
+function normalizeGtfsTime(timeStr) {
+  if (!timeStr || timeStr.trim() === '') return '';
+  
+  const parts = timeStr.trim().split(':');
+  if (parts.length < 2) return timeStr;
+  
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  const seconds = parts[2] || '00';
+  
+  // Keep hours as-is for GTFS logic (24+ means next day service)
+  // But format consistently
+  return `${String(hours).padStart(2, '0')}:${minutes}:${seconds}`;
+}
+
 // Parse CSV file and return array of objects with headers
 async function parseCSV(filePath) {
   return new Promise((resolve, reject) => {
@@ -200,104 +220,119 @@ async function loadGTFS() {
       console.warn(`Skipped ${skippedStopTimes} malformed stop_times rows`);
     }
 
+    // Process trips in batches for memory efficiency
+    const tripIds = Array.from(tripMap.keys());
+    const BATCH_SIZE = 50;
     let tripCount = 0;
-    for (const [tripId, times] of tripMap) {
-      // Sort by stop sequence
-      times.sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
-
-      // Create stop time nodes and connections
-      for (let i = 0; i < times.length; i++) {
-        const st = times[i];
-        const stopSequence = Number.parseInt(st.stop_sequence, 10);
-        if (Number.isNaN(stopSequence)) {
-          continue;
-        }
-
-        await session.run(
-          `MATCH (t:Trip {id: $tripId})
-           MATCH (stop:Stop {id: $stopId})
-           CREATE (st:StopTime {
-             trip_id: $tripId,
-             stop_id: $stopId,
-             stop_sequence: toInteger($stopSeq),
-             arrival_time: $arrivalTime,
-             departure_time: $departureTime
-           })
-           CREATE (t)-[:STOPS_AT]->(st)
-           CREATE (st)-[:AT_STOP]->(stop)`,
-          {
+    
+    for (let batchStart = 0; batchStart < tripIds.length; batchStart += BATCH_SIZE) {
+      const batchTripIds = tripIds.slice(batchStart, batchStart + BATCH_SIZE);
+      
+      // Prepare batch data for stop times
+      const stopTimeBatch = [];
+      const nextStopBatch = [];
+      
+      for (const tripId of batchTripIds) {
+        const times = tripMap.get(tripId);
+        times.sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
+        
+        for (let i = 0; i < times.length; i++) {
+          const st = times[i];
+          const stopSequence = Number.parseInt(st.stop_sequence, 10);
+          if (Number.isNaN(stopSequence)) continue;
+          
+          stopTimeBatch.push({
             tripId,
             stopId: st.stop_id,
             stopSeq: stopSequence,
-            arrivalTime: st.arrival_time || '',
-            departureTime: st.departure_time || ''
-          }
-        );
-
-        // Create connection to next stop in same trip
-        if (i < times.length - 1) {
-          const nextSt = times[i + 1];
-          const nextSequence = Number.parseInt(nextSt.stop_sequence, 10);
-          if (Number.isNaN(nextSequence)) {
-            continue;
-          }
-
-          await session.run(
-            `MATCH (st1:StopTime {trip_id: $tripId, stop_sequence: toInteger($seq1)})
-             MATCH (st2:StopTime {trip_id: $tripId, stop_sequence: toInteger($seq2)})
-             CREATE (st1)-[:NEXT_STOP {
-               arrival_time: $arrivalTime2,
-               departure_time: $departureTime1
-             }]->(st2)`,
-            {
-              tripId,
-              seq1: stopSequence,
-              seq2: nextSequence,
-              departureTime1: st.departure_time,
-              arrivalTime2: nextSt.arrival_time
+            arrivalTime: normalizeGtfsTime(st.arrival_time),
+            departureTime: normalizeGtfsTime(st.departure_time)
+          });
+          
+          // Prepare next stop relationship
+          if (i < times.length - 1) {
+            const nextSt = times[i + 1];
+            const nextSequence = Number.parseInt(nextSt.stop_sequence, 10);
+            if (!Number.isNaN(nextSequence)) {
+              nextStopBatch.push({
+                tripId,
+                seq1: stopSequence,
+                seq2: nextSequence,
+                departureTime1: normalizeGtfsTime(st.departure_time),
+                arrivalTime2: normalizeGtfsTime(nextSt.arrival_time)
+              });
             }
-          );
+          }
         }
       }
-
-      tripCount++;
-      if (tripCount % 500 === 0) {
-        console.log(`  Processed ${tripCount} trips...`);
+      
+      // Batch insert stop times
+      if (stopTimeBatch.length > 0) {
+        await session.run(
+          `UNWIND $batch as item
+           MATCH (t:Trip {id: item.tripId})
+           MATCH (stop:Stop {id: item.stopId})
+           CREATE (st:StopTime {
+             trip_id: item.tripId,
+             stop_id: item.stopId,
+             stop_sequence: item.stopSeq,
+             arrival_time: item.arrivalTime,
+             departure_time: item.departureTime
+           })
+           CREATE (t)-[:STOPS_AT]->(st)
+           CREATE (st)-[:AT_STOP]->(stop)`,
+          { batch: stopTimeBatch }
+        );
       }
+      
+      // Batch insert next stop relationships  
+      if (nextStopBatch.length > 0) {
+        await session.run(
+          `UNWIND $batch as item
+           MATCH (st1:StopTime {trip_id: item.tripId, stop_sequence: item.seq1})
+           MATCH (st2:StopTime {trip_id: item.tripId, stop_sequence: item.seq2})
+           CREATE (st1)-[:NEXT_STOP {
+             arrival_time: item.arrivalTime2,
+             departure_time: item.departureTime1
+           }]->(st2)`,
+          { batch: nextStopBatch }
+        );
+      }
+      
+      tripCount += batchTripIds.length;
+      if (tripCount % 500 === 0 || tripCount === tripIds.length) {
+        console.log(`  Processed ${tripCount}/${tripIds.length} trips...`);
+      }
+      
+      // Clear batch arrays to help garbage collection
+      stopTimeBatch.length = 0;
+      nextStopBatch.length = 0;
     }
+    
     console.log(`Loaded ${tripCount} trips with ${stopTimes.length} stop times`);
 
-    // Create transfer relationships between stops if there's enough time gap
-    console.log('Creating transfer relationships...');
-    await session.run(
-      `MATCH (s1:Stop)<-[:AT_STOP]-(st1:StopTime)
-       MATCH (s2:Stop)<-[:AT_STOP]-(st2:StopTime)
-       WHERE s1 <> s2
-       AND st1.trip_id <> st2.trip_id
-       AND st2.departure_time > st1.arrival_time
-       AND duration.between(time(st1.arrival_time), time(st2.departure_time)).minutes <= 15
-       CREATE (s1)-[:TRANSFER {
-         min_time: duration.between(time(st1.arrival_time), time(st2.departure_time)).minutes,
-         from_trip: st1.trip_id,
-         to_trip: st2.trip_id
-       }]->(s2)`
-    );
+    // Skip transfer relationships for now - they're complex and not required for basic routing
+    // The routing algorithm can find transfers by matching stops between different trips
+    console.log('Skipping transfer relationship creation (not required for routing)...');
 
     console.log('✓ GTFS data successfully loaded into Neo4j');
     console.log('\nDatabase Summary:');
-    const [stopsCount, routesCount, tripsCount, servicesCount, stopTimesCount] = await Promise.all([
-      session.run('MATCH (n:Stop) RETURN count(n) AS count'),
-      session.run('MATCH (n:Route) RETURN count(n) AS count'),
-      session.run('MATCH (n:Trip) RETURN count(n) AS count'),
-      session.run('MATCH (n:Service) RETURN count(n) AS count'),
-      session.run('MATCH (n:StopTime) RETURN count(n) AS count')
-    ]);
+    
+    // Run summary queries sequentially to avoid transaction issues
+    const stopsCount = await session.run('MATCH (n:Stop) RETURN count(n) AS count');
+    const routesCount = await session.run('MATCH (n:Route) RETURN count(n) AS count');
+    const tripsCount = await session.run('MATCH (n:Trip) RETURN count(n) AS count');
+    const servicesCount = await session.run('MATCH (n:Service) RETURN count(n) AS count');
+    const stopTimesCount = await session.run('MATCH (n:StopTime) RETURN count(n) AS count');
+    const nextStopCount = await session.run('MATCH ()-[r:NEXT_STOP]->() RETURN count(r) AS count');
+    
     console.log({
       stops: stopsCount.records[0].get('count'),
       routes: routesCount.records[0].get('count'),
       trips: tripsCount.records[0].get('count'),
       services: servicesCount.records[0].get('count'),
-      stopTimes: stopTimesCount.records[0].get('count')
+      stopTimes: stopTimesCount.records[0].get('count'),
+      nextStopRelationships: nextStopCount.records[0].get('count')
     });
 
   } catch (error) {

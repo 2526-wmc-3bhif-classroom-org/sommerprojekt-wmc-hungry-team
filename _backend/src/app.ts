@@ -6,13 +6,7 @@ import cors from 'cors';
 import busRouter from './routers/bus-route.js';
 import weatherRouter from './routers/weather.js';
 import placesRouter from './routers/places.js';
-
-console.log('env check...');
-console.log('host: ' + process.env.DB_HOST);
-console.log('user: ' + process.env.DB_USER);
-console.log('passw: ' + process.env.DB_PASSWORD);
-console.log('type of pw: ' + typeof process.env.DB_PASSWORD);
-console.log('name: ' + process.env.DB_NAME);
+import { closeNeo4j } from './repo/neo4j-driver.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +23,7 @@ app.use(placesRouter);
 
 process.on('SIGINT', async () => {
     console.log('Shutting down...');
+    await closeNeo4j();
     process.exit(0);
 });
 
