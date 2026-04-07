@@ -1,4 +1,4 @@
-import https from 'https';
+import { fetchJson } from '../utils/http.js';
 
 // Timezone constant - always use Vienna time
 const TIMEZONE = 'Europe/Vienna';
@@ -30,40 +30,6 @@ const WEATHER_CODE_MAP: Record<number, string> = {
   96: 'Thunderstorm with slight hail',
   99: 'Thunderstorm with heavy hail'
 };
-
-// Helper function to fetch JSON from HTTPS URL
-function fetchJson(url: string, timeout: number = 10000): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const request = https.get(url, (res) => {
-      let data = '';
-      
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(new Error('Invalid JSON response'));
-          }
-        } else {
-          reject(new Error(`HTTP ${res.statusCode}`));
-        }
-      });
-    });
-    
-    request.on('error', (err) => {
-      reject(err);
-    });
-    
-    request.setTimeout(timeout, () => {
-      request.destroy();
-      reject(new Error('Request timeout'));
-    });
-  });
-}
 
 // Type definitions
 export interface WeatherForecast {
