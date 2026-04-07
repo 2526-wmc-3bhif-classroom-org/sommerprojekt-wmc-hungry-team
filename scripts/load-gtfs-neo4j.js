@@ -1,4 +1,4 @@
-import neo4j from 'neo4j';
+import neo4j from 'neo4j-driver';
 import fs from 'fs';
 import path from 'path';
 import { createReadStream } from 'fs';
@@ -36,6 +36,10 @@ function parseCSVLine(line) {
   return result;
 }
 
+function normalizeHeader(header) {
+  return header.replace(/^\uFEFF/, '').trim();
+}
+
 // Parse CSV file and return array of objects with headers
 async function parseCSV(filePath) {
   return new Promise((resolve, reject) => {
@@ -51,7 +55,7 @@ async function parseCSV(filePath) {
 
     rl.on('line', (line) => {
       if (isFirst) {
-        headers = parseCSVLine(line);
+        headers = parseCSVLine(line).map(normalizeHeader);
         isFirst = false;
       } else if (line.trim()) {
         const values = parseCSVLine(line);
@@ -175,11 +179,25 @@ async function loadGTFS() {
     
     // Group by trip for efficiency
     const tripMap = new Map();
+    let skippedStopTimes = 0;
     for (const st of stopTimes) {
-      if (!tripMap.has(st.trip_id)) {
-        tripMap.set(st.trip_id, []);
+      const tripId = st.trip_id;
+      const stopId = st.stop_id;
+      const stopSeq = st.stop_sequence;
+
+      if (!tripId || !stopId || !stopSeq) {
+        skippedStopTimes++;
+        continue;
       }
-      tripMap.get(st.trip_id).push(st);
+
+      if (!tripMap.has(tripId)) {
+        tripMap.set(tripId, []);
+      }
+      tripMap.get(tripId).push(st);
+    }
+
+    if (skippedStopTimes > 0) {
+      console.warn(`Skipped ${skippedStopTimes} malformed stop_times rows`);
     }
 
     let tripCount = 0;
@@ -190,6 +208,11 @@ async function loadGTFS() {
       // Create stop time nodes and connections
       for (let i = 0; i < times.length; i++) {
         const st = times[i];
+        const stopSequence = Number.parseInt(st.stop_sequence, 10);
+        if (Number.isNaN(stopSequence)) {
+          continue;
+        }
+
         await session.run(
           `MATCH (t:Trip {id: $tripId})
            MATCH (stop:Stop {id: $stopId})
@@ -205,7 +228,7 @@ async function loadGTFS() {
           {
             tripId,
             stopId: st.stop_id,
-            stopSeq: st.stop_sequence,
+            stopSeq: stopSequence,
             arrivalTime: st.arrival_time || '',
             departureTime: st.departure_time || ''
           }
@@ -214,6 +237,11 @@ async function loadGTFS() {
         // Create connection to next stop in same trip
         if (i < times.length - 1) {
           const nextSt = times[i + 1];
+          const nextSequence = Number.parseInt(nextSt.stop_sequence, 10);
+          if (Number.isNaN(nextSequence)) {
+            continue;
+          }
+
           await session.run(
             `MATCH (st1:StopTime {trip_id: $tripId, stop_sequence: toInteger($seq1)})
              MATCH (st2:StopTime {trip_id: $tripId, stop_sequence: toInteger($seq2)})
@@ -223,8 +251,8 @@ async function loadGTFS() {
              }]->(st2)`,
             {
               tripId,
-              seq1: st.stop_sequence,
-              seq2: nextSt.stop_sequence,
+              seq1: stopSequence,
+              seq2: nextSequence,
               departureTime1: st.departure_time,
               arrivalTime2: nextSt.arrival_time
             }
@@ -257,15 +285,20 @@ async function loadGTFS() {
 
     console.log('✓ GTFS data successfully loaded into Neo4j');
     console.log('\nDatabase Summary:');
-    const stats = await session.run(
-      `RETURN 
-       count(distinct (n:Stop)) as stops,
-       count(distinct (n:Route)) as routes,
-       count(distinct (n:Trip)) as trips,
-       count(distinct (n:Service)) as services,
-       count(distinct (n:StopTime)) as stopTimes`
-    );
-    console.log(stats.records[0].toObject());
+    const [stopsCount, routesCount, tripsCount, servicesCount, stopTimesCount] = await Promise.all([
+      session.run('MATCH (n:Stop) RETURN count(n) AS count'),
+      session.run('MATCH (n:Route) RETURN count(n) AS count'),
+      session.run('MATCH (n:Trip) RETURN count(n) AS count'),
+      session.run('MATCH (n:Service) RETURN count(n) AS count'),
+      session.run('MATCH (n:StopTime) RETURN count(n) AS count')
+    ]);
+    console.log({
+      stops: stopsCount.records[0].get('count'),
+      routes: routesCount.records[0].get('count'),
+      trips: tripsCount.records[0].get('count'),
+      services: servicesCount.records[0].get('count'),
+      stopTimes: stopTimesCount.records[0].get('count')
+    });
 
   } catch (error) {
     console.error('Error loading GTFS data:', error);
