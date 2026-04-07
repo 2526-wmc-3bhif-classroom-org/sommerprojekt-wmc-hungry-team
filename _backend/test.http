@@ -1,19 +1,179 @@
-GET http://localhost:3000/api/bus/route?lon_a=14.28&lat_a=48.30&lon_b=14.32&lat_b=48.25&departure_time=08:30:00&max_transfers=2
+### ============================================
+### BUS ROUTING API TESTS
+### ============================================
+
+### Health Check - Neo4j Connection
+GET http://localhost:3000/api/bus/test
 Accept: application/json
 
-###
-GET localhost:3000/api/bus/test
+### --------------------------------------------
+### VALID ROUTING REQUESTS
+### --------------------------------------------
 
-###
-GET http://localhost:3000/api/bus/route?lon_a=14.27502937&lat_a=48.29107692&lon_b=14.26712419&lat_b=48.30039407&departure_time=08:30:00&max_transfers=2
+### Valid Route: Linz Hauptbahnhof → Leonding Meixnerkreuzung (morning)
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
 
-###
+### Valid Route: Same route, different time (afternoon)
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=14:00:00&max_transfers=2
+Accept: application/json
+
+### Valid Route: No transfers allowed
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=0
+Accept: application/json
+
+### Valid Route: Maximum transfers (5)
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=5
+Accept: application/json
+
+### Valid Route: Early morning departure
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=06:00:00&max_transfers=2
+Accept: application/json
+
+### Valid Route: Late evening departure
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=22:00:00&max_transfers=2
+Accept: application/json
+
+### --------------------------------------------
+### EDGE CASES - SHOULD RETURN 404 (No Route Found)
+### --------------------------------------------
+
+### No Route: Departure time too late (no service)
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=23:59:00&max_transfers=2
+Accept: application/json
+
+### No Route: Coordinates far from any stops
+GET http://localhost:3000/api/bus/route?lat_a=47.0&lon_a=15.0&lat_b=47.1&lon_b=15.1&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### --------------------------------------------
+### VALIDATION ERRORS - SHOULD RETURN 400
+### --------------------------------------------
+
+### Missing Parameter: lat_a
+GET http://localhost:3000/api/bus/route?lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Missing Parameter: lon_a
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Missing Parameter: lat_b
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Missing Parameter: lon_b
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Missing Parameter: departure_time
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&max_transfers=2
+Accept: application/json
+
+### Missing Parameter: max_transfers
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00
+Accept: application/json
+
+### Invalid Coordinate: lat_a out of range (> 90)
+GET http://localhost:3000/api/bus/route?lat_a=95&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Invalid Coordinate: lat_a out of range (< -90)
+GET http://localhost:3000/api/bus/route?lat_a=-95&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Invalid Coordinate: lon_a out of range (> 180)
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=200&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Invalid Coordinate: lon_a out of range (< -180)
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=-200&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Invalid Coordinate: Not a number
+GET http://localhost:3000/api/bus/route?lat_a=abc&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### Invalid Time Format: Missing seconds
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30&max_transfers=2
+Accept: application/json
+
+### Invalid Time Format: Single digit hour
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=8:30:00&max_transfers=2
+Accept: application/json
+
+### Invalid Time Format: Not a time
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=morning&max_transfers=2
+Accept: application/json
+
+### Invalid max_transfers: Negative
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=-1
+Accept: application/json
+
+### Invalid max_transfers: Too high (> 5)
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=10
+Accept: application/json
+
+### Invalid max_transfers: Not a number
+GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_b=48.26261292&lon_b=14.25910224&departure_time=08:30:00&max_transfers=two
+Accept: application/json
+
+### ============================================
+### WEATHER API TESTS
+### ============================================
+
+### Valid Weather Request: Linz
 GET http://localhost:3000/api/weather/forecast?lat=48.3069&lon=14.2858
-
-### Neo4j routing (primary backend)
-GET http://localhost:3000/api/bus/route?lon_a=14.28&lat_a=48.30&lon_b=14.32&lat_b=48.25&departure_time=08:30:00&max_transfers=2
 Accept: application/json
 
-### PostgreSQL routing (fallback comparison)
-GET http://localhost:3000/api/bus/route?lon_a=14.28&lat_a=48.30&lon_b=14.32&lat_b=48.25&departure_time=08:30:00&max_transfers=2&use_postgres=true
+### Valid Weather Request: Vienna
+GET http://localhost:3000/api/weather/forecast?lat=48.2082&lon=16.3738
+Accept: application/json
+
+### Missing Parameter: lat
+GET http://localhost:3000/api/weather/forecast?lon=14.2858
+Accept: application/json
+
+### Missing Parameter: lon
+GET http://localhost:3000/api/weather/forecast?lat=48.3069
+Accept: application/json
+
+### Invalid Coordinate: lat out of range
+GET http://localhost:3000/api/weather/forecast?lat=100&lon=14.2858
+Accept: application/json
+
+### Invalid Coordinate: lon out of range
+GET http://localhost:3000/api/weather/forecast?lat=48.3069&lon=200
+Accept: application/json
+
+### Invalid Coordinate: Not a number
+GET http://localhost:3000/api/weather/forecast?lat=invalid&lon=14.2858
+Accept: application/json
+
+### ============================================
+### PLACES/GEOCODING API TESTS
+### ============================================
+
+### Valid Place: Linz
+GET http://localhost:3000/api/places/geocode?place=Linz
+Accept: application/json
+
+### Valid Place: Specific Address
+GET http://localhost:3000/api/places/geocode?place=Hauptplatz%201%2C%20Linz
+Accept: application/json
+
+### Valid Place: Leonding
+GET http://localhost:3000/api/places/geocode?place=Leonding
+Accept: application/json
+
+### Missing Parameter: place
+GET http://localhost:3000/api/places/geocode
+Accept: application/json
+
+### Empty Place Parameter
+GET http://localhost:3000/api/places/geocode?place=
+Accept: application/json
+
+### Non-existent Place
+GET http://localhost:3000/api/places/geocode?place=ThisPlaceDoesNotExist12345
 Accept: application/json
