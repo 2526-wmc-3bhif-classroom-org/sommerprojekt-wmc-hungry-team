@@ -1,5 +1,6 @@
 import {Router, Request, Response} from 'express';
 import {findRoutes, testNeo4jConnection} from '../repo/bus-repo-neo4j.js';
+import {parseCoordinatePair, validateTimeFormat, validateMaxTransfers} from '../utils/validation.js';
 
 const router = Router();
 
@@ -34,45 +35,26 @@ router.get('/api/bus/route', async (req: Request, res: Response) => {
     try {
         const { lat_a, lon_a, lat_b, lon_b, departure_time, max_transfers } = req.query;
 
-        // Check all params are present
-        if (!lat_a || !lon_a || !lat_b || !lon_b || !departure_time || !max_transfers) {
-            return res.status(400).json({ error: 'Missing required parameters: lat_a, lon_a, lat_b, lon_b, departure_time, max_transfers' });
+        const coords = parseCoordinatePair(lat_a as string, lon_a as string, lat_b as string, lon_b as string);
+        if (!coords.valid) {
+            return res.status(400).json({ error: coords.error });
         }
 
-        // Validate coordinates are valid numbers
-        const parsedLatA = parseFloat(lat_a as string);
-        const parsedLonA = parseFloat(lon_a as string);
-        const parsedLatB = parseFloat(lat_b as string);
-        const parsedLonB = parseFloat(lon_b as string);
-
-        if ([parsedLatA, parsedLonA, parsedLatB, parsedLonB].some(isNaN)) {
-            return res.status(400).json({ error: 'Coordinates must be valid numbers' });
+        const timeResult = validateTimeFormat(departure_time as string);
+        if (!timeResult.valid) {
+            return res.status(400).json({ error: timeResult.error });
         }
 
-        // Validate coordinate ranges
-        if (parsedLatA < -90 || parsedLatA > 90 || parsedLatB < -90 || parsedLatB > 90) {
-            return res.status(400).json({ error: 'Latitude must be between -90 and 90' });
-        }
-        if (parsedLonA < -180 || parsedLonA > 180 || parsedLonB < -180 || parsedLonB > 180) {
-            return res.status(400).json({ error: 'Longitude must be between -180 and 180' });
-        }
-
-        // Validate departure_time format HH:MM:SS
-        if (!/^\d{2}:\d{2}:\d{2}$/.test(departure_time as string)) {
-            return res.status(400).json({ error: 'departure_time must be in HH:MM:SS format' });
-        }
-
-        // Validate max_transfers is a positive integer
-        const parsedMaxTransfers = parseInt(max_transfers as string);
-        if (isNaN(parsedMaxTransfers) || parsedMaxTransfers < 0 || parsedMaxTransfers > 5) {
-            return res.status(400).json({ error: 'max_transfers must be an integer between 0 and 5' });
+        const transfersResult = validateMaxTransfers(max_transfers as string);
+        if (!transfersResult.valid) {
+            return res.status(400).json({ error: transfersResult.error });
         }
 
         const routes = await findRoutes(
-            parsedLatA, parsedLonA,
-            parsedLatB, parsedLonB,
-            departure_time as string,
-            parsedMaxTransfers
+            coords.latA, coords.lonA,
+            coords.latB, coords.lonB,
+            timeResult.time,
+            transfersResult.maxTransfers
         );
 
         res.set('X-Route-Backend', 'neo4j');

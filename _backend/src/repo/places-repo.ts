@@ -1,39 +1,4 @@
-// @ts-ignore
-import https from 'https';
-
-// Helper function to fetch JSON from HTTPS URL
-function fetchJson(url: string, timeout: number = 5000): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const request = https.get(url, (res) => {
-      let data = '';
-      
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(new Error('Invalid JSON response'));
-          }
-        } else {
-          reject(new Error(`HTTP ${res.statusCode}`));
-        }
-      });
-    });
-    
-    request.on('error', (err) => {
-      reject(err);
-    });
-    
-    request.setTimeout(timeout, () => {
-      request.destroy();
-      reject(new Error('Request timeout'));
-    });
-  });
-}
+import { fetchJson } from '../utils/http.js';
 
 // Type definition
 export interface PlaceResult {

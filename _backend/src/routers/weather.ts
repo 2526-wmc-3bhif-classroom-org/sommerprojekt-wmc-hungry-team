@@ -1,44 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { fetchWeatherForecast } from '../repo/weather-repo.js';
+import { parseCoordinates } from '../utils/validation.js';
 
 const router = Router();
 
 router.get('/api/weather/forecast', async (req: Request, res: Response) => {
   try {
-    const { lat, lon } = req.query;
-
-    // Check required parameters
-    if (!lat || !lon) {
-      return res.status(400).json({ 
-        error: 'Missing required parameters: lat, lon' 
-      });
+    const coords = parseCoordinates(req.query.lat as string, req.query.lon as string);
+    if (!coords.valid) {
+      return res.status(400).json({ error: coords.error });
     }
 
-    // Parse and validate numbers
-    const parsedLat = parseFloat(lat as string);
-    const parsedLon = parseFloat(lon as string);
-
-    if (isNaN(parsedLat) || isNaN(parsedLon)) {
-      return res.status(400).json({ 
-        error: 'Coordinates must be valid numbers' 
-      });
-    }
-
-    // Validate coordinate ranges
-    if (parsedLat < -90 || parsedLat > 90) {
-      return res.status(400).json({ 
-        error: 'Latitude must be between -90 and 90' 
-      });
-    }
-    
-    if (parsedLon < -180 || parsedLon > 180) {
-      return res.status(400).json({ 
-        error: 'Longitude must be between -180 and 180' 
-      });
-    }
-
-    // Call repository function
-    const forecast = await fetchWeatherForecast(parsedLat, parsedLon);
+    const forecast = await fetchWeatherForecast(coords.lat, coords.lon);
 
     // Return success response
     res.json(forecast);

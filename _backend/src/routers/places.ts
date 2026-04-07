@@ -1,21 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { geocodePlace } from '../repo/places-repo.js';
+import { validateRequiredString } from '../utils/validation.js';
 
 const router = Router();
 
 router.get('/api/places/geocode', async (req: Request, res: Response) => {
   try {
-    const { place } = req.query;
-
-    // Validate required parameter
-    if (!place || typeof place !== 'string' || place.trim().length === 0) {
-      return res.status(400).json({ 
-        error: 'Missing required parameter: place' 
-      });
+    const placeResult = validateRequiredString(req.query.place as string, 'place');
+    if (!placeResult.valid) {
+      return res.status(400).json({ error: placeResult.error });
     }
 
-    // Call repository function
-    const result = await geocodePlace(place as string);
+    const result = await geocodePlace(placeResult.value);
 
     // Return success response
     res.json(result);
