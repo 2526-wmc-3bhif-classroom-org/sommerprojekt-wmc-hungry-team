@@ -9,3 +9,11 @@ GET http://localhost:3000/api/bus/route?lon_a=14.27502937&lat_a=48.29107692&lon_
 
 ###
 GET http://localhost:3000/api/weather/forecast?lat=48.3069&lon=14.2858
+
+### Neo4j routing (primary backend)
+GET http://localhost:3000/api/bus/route?lon_a=14.28&lat_a=48.30&lon_b=14.32&lat_b=48.25&departure_time=08:30:00&max_transfers=2
+Accept: application/json
+
+### PostgreSQL routing (fallback comparison)
+GET http://localhost:3000/api/bus/route?lon_a=14.28&lat_a=48.30&lon_b=14.32&lat_b=48.25&departure_time=08:30:00&max_transfers=2&use_postgres=true
+Accept: application/json

@@ -1,354 +1,650 @@
-# SmartHub - Copilot Instructions
+# SmartHub - Complete Project Guide
 
-SmartHub is a Raspberry Pi dashboard web application that displays real-time transit information, weather, clock, and integrates with KNX IoT devices. It supports multi-user access via Google accounts and features configurable time-based "Routines" to display different information widgets.
+SmartHub is a Raspberry Pi dashboard web application that displays real-time transit information, weather forecasts, clock, and integrates with KNX IoT devices. It supports multi-user access via Google accounts and features configurable time-based "Routines" to display different information widgets.
 
-**Project Status**: Bus routing and weather service implemented. Google Calendar integration, routines configuration, and KNX/AI features are planned.
+**Team**: Arthur Dirnberger, Matthias Darabosch, Benjamin Stoica, Almir Hadzic
 
-## Recent Changes (2026-03-17)
+---
 
-**Weather Service Implementation**: Complete backend API for weather forecasts and geocoding.
-- Added OpenMeteo API integration for 2-hour interval weather forecasts
-- Added Google Geocoding API for place name → coordinates conversion
-- Vienna timezone hardcoded (`Europe/Vienna`) for all weather requests
-- Weather endpoint filters forecasts from now until midnight (current day)
-- Places endpoint shared by both weather and bus routing widgets
-- Frontend Pinia store created; widget implementation deferred for Nuxt migration
-- See `docs/topics/weather.md` for complete API documentation
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [Technology Stack](#technology-stack)
+3. [Project Structure](#project-structure)
+4. [Development Setup](#development-setup)
+5. [Backend Architecture](#backend-architecture)
+6. [Frontend Architecture](#frontend-architecture)
+7. [Database Systems](#database-systems)
+8. [API Reference](#api-reference)
+9. [External Services](#external-services)
+10. [Code Conventions](#code-conventions)
+11. [Environment Configuration](#environment-configuration)
+12. [Planned Features](#planned-features)
+
+---
+
+## Project Overview
+
+SmartHub runs on a Raspberry Pi connected to an LCD panel positioned over a nightstand. It helps users get organized in the morning by displaying:
+
+- **Bus/Transit routes** - Real-time journey planning with GTFS data
+- **Weather forecasts** - 2-hour interval forecasts via OpenMeteo
+- **Clock/Time** - Current time display
+- **Calendar events** - Google Calendar integration (planned)
+- **KNX device control** - Shutters, LED lights (planned)
+
+### Current Implementation Status
+
+| Feature | Status |
+|---------|--------|
+| Bus routing (PostgreSQL) | ✅ Implemented |
+| Bus routing (Neo4j) | ✅ Implemented, testing |
+| Weather forecasts | ✅ Implemented |
+| Places/Geocoding | ✅ Implemented |
+| Clock widget | ✅ Implemented |
+| Frontend (Nuxt) | 🔄 In progress |
+| Google Calendar | 📋 Planned |
+| Routines system | 📋 Planned |
+| KNX integration | 📋 Planned |
+| AI features | 📋 Planned |
+
+---
 
 ## Technology Stack
 
-- **Frontend**: Vue 3 + TypeScript + Vite + Pinia + Vue Router (migrating to Nuxt planned)
-- **Backend**: Express + TypeScript (via tsx)
-- **Databases**: 
-  - PostgreSQL with PostGIS (GTFS transit data)
-- **Data Sources**: 
-  - GTFS feeds (2026) from Austrian transit (LINZ AG, OOEVV)
-  - OpenMeteo API (weather forecasts - implemented)
-  - Google Geocoding API (place → coordinates - implemented)
-  - Google Calendar API (planned: user calendars)
+### Frontend
+- **Framework**: Nuxt 4 (Vue 3 + TypeScript)
+- **State Management**: Pinia
+- **Styling**: CSS (component-scoped)
 
-## Development Commands
+### Backend
+- **Runtime**: Node.js 20.19+ or 22.12+
+- **Framework**: Express + TypeScript
+- **Execution**: tsx (TypeScript execution)
 
-### Frontend (`_frontend/smarthub/`)
+### Databases
+- **PostgreSQL + PostGIS**: GTFS transit data (legacy routing)
+- **Neo4j 5**: Graph database for transit routing (primary)
 
-```bash
-npm run dev          # Start Vite dev server
-npm run build        # Type-check + production build (vue-tsc + vite)
-npm run type-check   # Run Vue TypeScript checking only
-npm run preview      # Preview production build
+### External APIs
+- **OpenMeteo**: Weather forecasts (free, no auth)
+- **Google Geocoding**: Place name → coordinates
+- **Google Calendar**: User calendar data (planned)
+
+### Infrastructure
+- **Docker Compose**: Database orchestration
+- **GTFS Data**: Austrian transit feeds (LINZ AG, OOEVV)
+
+---
+
+## Project Structure
+
+```
+sommerprojekt-wmc-hungry-team/
+├── _backend/                    # Express API server
+│   ├── src/
+│   │   ├── app.ts              # Server entry point
+│   │   ├── routers/            # HTTP route handlers
+│   │   │   ├── bus-route.ts    # Transit routing endpoints
+│   │   │   ├── weather.ts      # Weather endpoints
+│   │   │   └── places.ts       # Geocoding endpoints
+│   │   └── repo/               # Data access layer
+│   │       ├── bus-repo.ts     # PostgreSQL routing
+│   │       ├── bus-repo-neo4j.ts # Neo4j routing
+│   │       ├── neo4j-driver.ts # Neo4j connection pool
+│   │       ├── weather-repo.ts # OpenMeteo integration
+│   │       └── places-repo.ts  # Google Geocoding
+│   └── package.json
+│
+├── _frontend/smarthub/          # Nuxt application
+│   └── app/
+│       ├── app.vue             # Root component
+│       ├── pages/              # Route pages
+│       │   └── index.vue       # Dashboard page
+│       ├── layouts/            # Page layouts
+│       │   └── default.vue     # Default layout with header
+│       └── components/         # Reusable widgets
+│           ├── ClockWidget.vue
+│           ├── WeatherWidget.vue
+│           ├── BusRouteChart.vue
+│           └── ...
+│
+├── data/                        # GTFS data files
+│   └── LINZ_AG_GTFS_2026.zip
+│
+├── scripts/                     # Utility scripts
+│   └── load-gtfs-neo4j.js      # Neo4j data importer
+│
+├── docs/                        # Documentation
+│   ├── topics/                 # Topic-specific docs
+│   └── ...
+│
+├── docker-compose.yaml          # Database services
+├── .env                         # Environment variables
+└── .env.example                 # Environment template
 ```
 
-### Backend (`_backend/`)
+---
+
+## Development Setup
+
+### Prerequisites
+- Node.js 20.19+ or 22.12+
+- Docker and Docker Compose
+- Google API key (for geocoding)
+
+### Quick Start
 
 ```bash
-npm run dev          # Start with tsx (src/app.ts)
-npm start            # Production mode (node dist/app.js)
-```
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your credentials
 
-### Database & Docker
-
-```bash
-docker-compose up    # Start PostgreSQL+PostGIS with GTFS loader
-```
-
-The loader service automatically imports GTFS data from `data/` directory on first run.
-
-### Typical Development Workflow
-
-```bash
-# Terminal 1: Database
+# 2. Start databases
 docker-compose up
 
-# Terminal 2: Backend API
+# 3. Install backend dependencies
+cd _backend && npm install
+
+# 4. Start backend (new terminal)
 cd _backend && npm run dev
 
-# Terminal 3: Frontend
+# 5. Start frontend (new terminal)
 cd _frontend/smarthub && npm run dev
 ```
 
-## Architecture
+### Development Commands
 
-### Backend Structure
-
-```
-_backend/
-├── src/
-│   ├── app.ts              # Express server entry point
-│   ├── routers/            # Route handlers (HTTP layer)
-│   │   ├── bus-route.ts    # Bus API endpoints
-│   │   ├── weather.ts      # Weather API endpoints
-│   │   └── places.ts       # Geocoding API endpoints
-│   └── repo/               # Data access layer
-│       ├── bus-repo.ts     # PostgreSQL/PostGIS queries
-│       ├── weather-repo.ts # OpenMeteo API integration
-│       └── places-repo.ts  # Google Geocoding API
+**Backend** (`_backend/`):
+```bash
+npm run dev      # Start with tsx (hot reload)
+npm start        # Production mode
 ```
 
-**Layering Pattern**: Routers handle HTTP → Repo handles data fetching/queries
-
-- **app.ts**: Server initialization, middleware registration, route mounting
-- **routers/**: Express route handlers with input validation
-- **repo/**: Data fetching logic (database queries, external APIs)
-
-### Frontend Structure
-
-```
-_frontend/smarthub/src/
-├── main.ts                 # Vue app entry (Pinia + Router setup)
-├── App.vue                 # Root component
-├── router/index.ts         # Route definitions
-├── views/Dashboard.vue     # Main dashboard view
-└── components/             # Reusable widgets
-    ├── ClockWidget.vue
-    ├── WeatherWidget.vue
-    ├── BusRouteChart.vue
-    ├── MapView.vue
-    ├── RoutePanel.vue
-    ├── InfoPanel.vue
-    ├── SettingsModal.vue
-    └── RoutineConfigModal.vue
+**Frontend** (`_frontend/smarthub/`):
+```bash
+npm run dev      # Start Nuxt dev server
+npm run build    # Production build
+npm run preview  # Preview production build
 ```
 
-All components use **Composition API** with `<script setup lang="ts">`.
-
-### Database Schema
-
-**PostgreSQL (GTFS transit data)** - Uses standard GTFS schema with PostGIS extensions:
-
-- Core tables: `stops`, `routes`, `trips`, `stop_times`, `calendar`, `agency`
-- Geospatial: `stops.stop_loc` (PostGIS POINT for distance calculations)
-- SRID 4326 (WGS84) for coordinate system
-
-**SQLite (cancelled)** - ~~Will store OpenMeteo weather forecast data locally~~ No longer needed; weather fetched fresh at routine start and cached temporarily in frontend.
-
-## Key Conventions
-
-### Naming
-
-- **Files**: kebab-case (`bus-route.ts`, `clock-widget.vue`, `weather-repo.ts`)
-- **Components**: PascalCase in code, kebab-case filenames (`ClockWidget.vue`)
-- **Functions/Variables**: camelCase
-
-### External API Integration
-
-**OpenMeteo (Weather):**
-- No authentication required (free tier: 10k requests/day)
-- Endpoint: `https://api.open-meteo.com/v1/forecast`
-- Always use Vienna timezone: `timezone=Europe/Vienna` (hardcoded constant)
-- 2-hour interval filtering: Take every other hour from hourly data
-- Day boundary: Filter forecasts to only include times until 23:59 Vienna time
-
-**Google Geocoding (Places):**
-- Requires `GOOGLE_KEY` from environment
-- Endpoint: `https://maps.googleapis.com/maps/api/geocode/json`
-- Austria-biased: Always include `region=at` parameter
-- Rate limit: 40k requests/month free tier
-- Returns `lng` but convert to `lon` for consistency
-
-**HTTP Client:**
-- Use Node.js built-in `https` module wrapped in Promise
-- No external dependencies (axios/fetch) for Raspberry Pi performance
-- Standard timeout: 10 seconds for weather, 5 seconds for geocoding
-
-### API Endpoints
-
-Base paths:
-- `/api/bus/` - Transit routing
-- `/api/weather/` - Weather forecasts
-- `/api/places/` - Geocoding service
-
-**Bus Routes:**
-- `GET /api/bus/test` - Database health check
-- `GET /api/bus/route` - Multi-leg journey planning
-  - Query params: `lat_a`, `lon_a`, `lat_b`, `lon_b`, `departure_time`, `max_transfers`
-  - Returns up to 5 route options sorted by number of legs, then duration
-  - Supports 0-5 transfers with 3-minute minimum connection time
-
-**Weather Forecast:**
-- `GET /api/weather/forecast` - Weather data for location
-  - Query params: `lat`, `lon`
-  - Returns 2-hour interval forecasts from now until midnight (Vienna time)
-  - Includes temperature, feels-like, wind, precipitation, weather codes, conditions
-  - Uses OpenMeteo API (no auth required)
-
-**Places Geocoding (Shared Service):**
-- `GET /api/places/geocode` - Convert place name to coordinates
-  - Query params: `place` (place name or address)
-  - Returns coordinates and formatted address
-  - Uses Google Geocoding API (biased to Austria: `region=at`)
-  - Shared by both weather and bus routing widgets
-
-### Database Patterns
-
-**Complex queries use CTEs** for multi-step logic:
-
-```sql
-WITH closest_start AS (...),
-     closest_end AS (...),
-     direct_routes AS (...),
-     one_transfer_routes AS (...)
-SELECT ...
+**Docker**:
+```bash
+docker-compose up              # Start all services
+docker-compose up -d           # Start detached
+docker-compose logs neo4j      # View Neo4j logs
+docker-compose logs neo4j-loader  # View data import logs
 ```
 
-**PostGIS distance operator** for nearest-neighbor searches:
+---
 
-```sql
-ORDER BY stop_loc <-> ST_SetSRID(ST_MakePoint(lon, lat), 4326)
+## Backend Architecture
+
+### Layering Pattern
+
+```
+HTTP Request
+    ↓
+Router (routers/*.ts)
+    - Input validation
+    - HTTP status codes
+    - Error handling
+    ↓
+Repository (repo/*.ts)
+    - Business logic
+    - Database queries
+    - External API calls
+    ↓
+Response
 ```
 
-**Query requirements**:
-- Always set statement timeout (10 seconds per query)
-- Use parameterized queries ($1, $2, etc.) for user input
-- Validate coordinates: latitude ±90, longitude ±180
-- Time format: HH:MM:SS (24-hour)
+### Router Responsibilities
+- Validate all query parameters
+- Parse and type-convert inputs
+- Call repository functions
+- Return appropriate HTTP status codes
+- Handle errors gracefully
 
-### Database Connection
+### Repository Responsibilities
+- Execute database queries
+- Call external APIs
+- Transform data formats
+- Throw errors for exceptional cases
 
-Single connection pool pattern:
+### Connection Management
 
+**PostgreSQL** - Single connection pool:
 ```typescript
-// In repo/bus-repo.ts
+let pool: Pool | null = null;
 const getPool = (): Pool => {
   if (!pool) {
-    pool = new Pool({ /* config */ });
+    pool = new Pool({ /* config from env */ });
   }
   return pool;
 };
 ```
 
-Pool is lazily initialized and reused across requests.
-
-### Service Day Calculation
-
-GTFS calendar uses boolean columns for each day:
-
-```sql
-WHERE (
-  (EXTRACT(DOW FROM service_date) = 0 AND c.sunday = 1) OR
-  (EXTRACT(DOW FROM service_date) = 1 AND c.monday = 1) OR
-  -- ... etc
-)
+**Neo4j** - Driver with session factory:
+```typescript
+let driver: Driver | null = null;
+export const getNeo4jDriver = () => {
+  if (!driver) {
+    driver = neo4j.driver(uri, auth, { maxConnectionPoolSize: 50 });
+  }
+  return driver;
+};
+export const getNeo4jSession = () => getNeo4jDriver().session({ database: 'neo4j' });
 ```
 
-Map JavaScript day-of-week to calendar table flags.
+---
+
+## Frontend Architecture
+
+### Nuxt Structure
+
+- **`app/pages/`**: File-based routing (each .vue = route)
+- **`app/layouts/`**: Shared page layouts
+- **`app/components/`**: Auto-imported components
+
+### Component Pattern
+
+All components use Composition API with `<script setup lang="ts">`:
+
+```vue
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+
+const data = ref<SomeType | null>(null)
+
+onMounted(async () => {
+  // fetch data
+})
+</script>
+
+<template>
+  <div>{{ data }}</div>
+</template>
+
+<style scoped>
+/* component styles */
+</style>
+```
+
+### State Management
+
+Pinia stores for shared state:
+```typescript
+// stores/weather.ts
+export const useWeatherStore = defineStore('weather', {
+  state: () => ({
+    forecasts: new Map<string, WeatherForecast>()
+  }),
+  actions: {
+    async fetchWeather(lat: number, lon: number) {
+      const response = await fetch(`/api/weather/forecast?lat=${lat}&lon=${lon}`)
+      const data = await response.json()
+      this.forecasts.set(`${lat},${lon}`, data)
+      return data
+    }
+  }
+})
+```
+
+---
+
+## Database Systems
+
+### PostgreSQL + PostGIS (Legacy)
+
+**Purpose**: GTFS transit data storage, fallback routing
+
+**Schema** (standard GTFS):
+- `stops` - Transit stops with PostGIS POINT geometry
+- `routes` - Bus/tram/train lines
+- `trips` - Scheduled service runs
+- `stop_times` - Stop visit times per trip
+- `calendar` - Service day patterns
+- `agency` - Transit operators
+
+**Key Features**:
+- PostGIS for geospatial queries
+- SRID 4326 (WGS84) coordinates
+- Distance operator: `stop_loc <-> ST_MakePoint(lon, lat)`
+
+### Neo4j (Primary for Routing)
+
+**Purpose**: Graph-based transit routing with native path finding
+
+**Node Types**:
+| Node | Properties |
+|------|------------|
+| Stop | id, name, latitude, longitude |
+| Route | id, short_name, long_name, type |
+| Trip | id, route_id, service_id, headsign |
+| StopTime | trip_id, stop_id, stop_sequence, arrival_time, departure_time |
+| Service | id, monday-sunday flags, start_date, end_date |
+
+**Relationships**:
+| Relationship | Pattern | Purpose |
+|-------------|---------|---------|
+| STOPS_AT | Trip → StopTime | Trip visits stop |
+| AT_STOP | StopTime → Stop | Stop time at physical stop |
+| NEXT_STOP | StopTime → StopTime | Consecutive stops on trip |
+| ON_ROUTE | Trip → Route | Trip belongs to route |
+| ON_SERVICE | Trip → Service | Trip runs on service |
+| TRANSFER | Stop → Stop | Transfer opportunity |
+
+**Advantages over PostgreSQL**:
+- Native shortest-path algorithms (Dijkstra)
+- O(hops) performance, not O(data size)
+- Unlimited transfer support
+- Simpler queries (Cypher vs complex SQL CTEs)
+
+### Dual Database Strategy
+
+The bus routing API uses Neo4j as primary with PostgreSQL fallback:
+
+1. Try Neo4j routing first
+2. If Neo4j fails → automatic fallback to PostgreSQL
+3. `?use_postgres=true` forces PostgreSQL (for testing)
+4. `X-Route-Backend` header shows which was used
+
+---
+
+## API Reference
+
+### Bus Routing
+
+**GET /api/bus/test**
+
+Health check for database connections.
+
+Response:
+```json
+{
+  "status": "ok",
+  "backends": {
+    "neo4j": "up",
+    "postgresql": "up"
+  }
+}
+```
+
+**GET /api/bus/route**
+
+Find transit routes between two points.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| lat_a | number | Yes | Start latitude (-90 to 90) |
+| lon_a | number | Yes | Start longitude (-180 to 180) |
+| lat_b | number | Yes | End latitude |
+| lon_b | number | Yes | End longitude |
+| departure_time | string | Yes | HH:MM:SS format |
+| max_transfers | number | Yes | 0-5 transfers allowed |
+| use_postgres | boolean | No | Force PostgreSQL backend |
+
+Response:
+```json
+[
+  {
+    "legs": 1,
+    "duration_minutes": 15,
+    "departure_time": "08:30:00",
+    "arrival_time": "08:45:00",
+    "boarded_at_stop_id": "...",
+    "boarded_at_stop_name": "Linz Hbf",
+    "alight_at_stop_id": "...",
+    "alight_at_stop_name": "Destination",
+    "route_short_name": "28",
+    "route_long_name": "Line 28",
+    "route_type": 3
+  }
+]
+```
+
+Headers: `X-Route-Backend: neo4j` or `postgresql`
+
+### Weather
+
+**GET /api/weather/forecast**
+
+Get weather forecast for location.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| lat | number | Yes | Latitude (-90 to 90) |
+| lon | number | Yes | Longitude (-180 to 180) |
+
+Response:
+```json
+{
+  "location": { "latitude": 48.3069, "longitude": 14.2858 },
+  "timezone": "Europe/Vienna",
+  "forecasts": [
+    {
+      "time": "2026-04-07T10:00:00",
+      "temperature": 12.5,
+      "feelsLike": 10.3,
+      "humidity": 65,
+      "windSpeed": 15.2,
+      "windDirection": 220,
+      "windGusts": 25.0,
+      "precipitation": 0.0,
+      "precipitationProbability": 10,
+      "weatherCode": 2,
+      "weatherDescription": "Partly cloudy",
+      "cloudCover": 45,
+      "visibility": 10000,
+      "isDay": true,
+      "conditions": {
+        "snow": false,
+        "rain": false,
+        "ice": false,
+        "sunny": false,
+        "cloudy": true
+      }
+    }
+  ]
+}
+```
+
+**Notes**:
+- Returns 2-hour intervals from now until midnight (Vienna time)
+- Timezone is always `Europe/Vienna` (hardcoded)
+
+### Places/Geocoding
+
+**GET /api/places/geocode**
+
+Convert place name to coordinates.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| place | string | Yes | Place name or address |
+
+Response:
+```json
+{
+  "place": "Linz, Austria",
+  "coordinates": { "lat": 48.3069, "lon": 14.2858 },
+  "formattedAddress": "Linz, Upper Austria, Austria"
+}
+```
+
+**Notes**:
+- Biased to Austria (`region=at`)
+- Shared by both weather and bus routing widgets
+
+---
+
+## External Services
+
+### OpenMeteo (Weather)
+
+- **Endpoint**: `https://api.open-meteo.com/v1/forecast`
+- **Auth**: None required (free tier)
+- **Rate limit**: 10,000 requests/day
+- **Timeout**: 10 seconds
+
+**Parameters used**:
+```
+latitude, longitude
+hourly: temperature_2m, apparent_temperature, relative_humidity_2m,
+        precipitation, precipitation_probability, weather_code,
+        cloud_cover, wind_speed_10m, wind_direction_10m, wind_gusts_10m,
+        visibility, is_day
+timezone: Europe/Vienna
+forecast_days: 1
+```
+
+### Google Geocoding
+
+- **Endpoint**: `https://maps.googleapis.com/maps/api/geocode/json`
+- **Auth**: `GOOGLE_KEY` environment variable
+- **Rate limit**: 40,000 requests/month (free tier)
+- **Timeout**: 5 seconds
+
+**Parameters used**:
+```
+address: <place name>
+key: <API key>
+region: at
+```
+
+### GTFS Data Sources
+
+- **LINZ AG**: Linz city transit
+- **OOEVV**: Upper Austria regional transit
+- **Source**: https://data.mobilitaetsverbuende.at/de/data-sets
+- **Format**: Standard GTFS (ZIP files in `data/` directory)
+
+---
+
+## Code Conventions
+
+### File Naming
+- **TypeScript files**: kebab-case (`bus-route.ts`, `weather-repo.ts`)
+- **Vue components**: kebab-case files, PascalCase in code (`ClockWidget.vue`)
+
+### Code Style
+- **Functions/Variables**: camelCase
+- **Types/Interfaces**: PascalCase
+- **Constants**: UPPER_SNAKE_CASE
+
+### Import Extensions
+TypeScript files use `.js` extension in imports (tsx requirement):
+```typescript
+import { fetchWeatherForecast } from '../repo/weather-repo.js';
+```
+
+### Error Handling
+
+Routers catch errors and return appropriate status codes:
+```typescript
+try {
+  const result = await repoFunction(params);
+  res.json(result);
+} catch (e: any) {
+  if (e.message?.includes('not found')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  if (e.message?.includes('unavailable')) {
+    return res.status(503).json({ error: 'Service unavailable' });
+  }
+  res.status(500).json({ error: 'Internal server error' });
+}
+```
+
+### HTTP Client
+
+Use Node.js built-in `https` module (no axios/fetch for Raspberry Pi performance):
+```typescript
+import https from 'https';
+
+function fetchJson(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          resolve(JSON.parse(data));
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}`));
+        }
+      });
+    }).on('error', reject);
+  });
+}
+```
+
+---
 
 ## Environment Configuration
 
-Required variables in `.env` (project root):
+Create `.env` in project root:
 
 ```env
-# Database (PostgreSQL + PostGIS)
+# PostgreSQL (GTFS data)
 DB_USER=transit_admin
 DB_PASSWORD=admin
 DB_NAME=gtfs_data
 DB_HOST=localhost
 DB_PORT=5432
 
-# Google APIs (Geocoding for places)
-GOOGLE_KEY=<your-api-key>
+# Neo4j (Graph routing)
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_secure_password
+NEO4J_HOST=localhost
+NEO4J_BOLT_PORT=7687
+NEO4J_HTTP_PORT=7474
+
+# Google APIs
+GOOGLE_KEY=your_google_api_key
 ```
 
-Backend loads from `../.env` (parent directory of `_backend/`).
+Backend loads from `../.env` (parent of `_backend/`).
 
-**Note**: OpenMeteo API requires no authentication.
-
-## Node Version Requirements
-
-Frontend requires Node 20.19.0 or ≥22.12.0 (from `package.json` engines field).
+---
 
 ## Planned Features
 
-### Multi-User Authentication
-- Google OAuth2 authentication for user login
-- Access to user's Google Calendar data
-- Multiple users can configure their own dashboard preferences
-
-### Weather Integration
-- Fetch forecast data from OpenMeteo API
-- Store locally in SQLite database
-- Display weather forecasts at configurable locations
-
 ### Routines System
-- Time-based configuration system
-- Users configure what information displays at specific times
-- Customizable widgets: weather forecasts, bus routes, driving routes, calendar events, etc.
-- Default interface shows time, weather, and other base information
+Time-based configuration for dashboard widgets:
+- Users configure what displays at specific times
+- Morning routine: weather, bus routes, calendar
+- Evening routine: different widget set
+- Customizable per user
 
-### Future Integrations
-- **KNX Assistant**: Control shutters and LED lights
-- **AI Integration**: Planned for intelligent recommendations/automation
+### Google Calendar Integration
+- OAuth2 authentication
+- Display today's events
+- Calendar-based routine triggers
 
-## Integration Points
+### KNX Integration
+- Control shutters and LED lights
+- Scene activation from dashboard
+- Integration with routines
 
-### Implemented
-- **GTFS Data**: Austrian transit (LINZ AG, OOEVV) in `data/` directory as ZIP files
-  - License info: https://gemini.google.com/share/091dd2894547
-  - Dataset source: https://data.mobilitaetsverbuende.at/de/data-sets
-  - GTFS format: https://gemini.google.com/share/f321ec23f926
-- **OpenMeteo API**: Weather forecast data (free, no auth required)
-- **Google Geocoding API**: Place name to coordinates conversion
-  - Shared by both weather and bus routing widgets
+### AI Features
+- Intelligent recommendations
+- Natural language queries
+- Automation suggestions
 
-### Planned
-- **Google Calendar API**: OAuth2 authentication and calendar access (https://gemini.google.com/share/4cd4e5188999)
-- **KNX Protocol**: Smart home device control
-- **AI Services**: To be determined
+---
 
-## Development Session Notes
+## Additional Documentation
 
-### Session 2026-03-25: Neo4j Route Finding Migration
+Detailed topic documentation in `docs/topics/`:
+- `bus.md` - Bus routing implementation
+- `weather.md` - Weather API documentation
+- `neo4j-routing.md` - Neo4j graph model and algorithms
+- `neo4j-migration-plan.md` - PostgreSQL to Neo4j migration
+- `docker.md` - Docker configuration
+- `dataset.md` - GTFS data format
+- `google.md` - Google API architecture
 
-**Objective**: Replace PostgreSQL routing with Neo4j graph database for better performance and correctness.
-
-**Issues with PostgreSQL Implementation**:
-- Only supports 2 transfer levels despite claiming 5
-- Incorrect JOIN logic missing valid transfer scenarios
-- No actual stop connectivity validation
-- Fragile calendar handling (string comparison on day names)
-- Performance degrades exponentially with transfers
-- Doesn't find shortest/best paths reliably
-
-**Solution: Neo4j Graph Database**:
-- Native shortest-path algorithms (Dijkstra, A*)
-- Explicit modeling of transit network as graph
-- Path finding is O(hops) not O(data size)
-- Support unlimited transfers with consistent performance
-- Simpler, more maintainable code
-
-**Implementation Approach**:
-- Parallel setup: Both databases running for testing
-- Neo4j as primary, PostgreSQL as fallback
-- Automatic fallback if Neo4j fails
-- `?use_postgres=true` query param for explicit testing
-- Response header `X-Route-Backend` shows which backend was used
-
-**Files Created**:
-- `docker-compose.yaml` - Added Neo4j service + loader
-- `scripts/load-gtfs-neo4j.js` - GTFS data import script
-- `_backend/src/repo/neo4j-driver.ts` - Connection pooling
-- `_backend/src/repo/bus-repo-neo4j.ts` - Routing algorithms
-- `_backend/package.json` - Added neo4j dependency
-- `docs/topics/neo4j-routing.md` - Complete implementation guide
-
-**Testing Results** (to be completed):
-- [ ] Route quality comparison (Neo4j vs PostgreSQL)
-- [ ] Performance benchmarking (target: 100-500ms vs 2-5s)
-- [ ] Multi-transfer path finding (up to 5 transfers)
-- [ ] Error handling and fallback mechanisms
-
-**Status**:
-- ✅ Docker setup with both databases
-- ✅ Neo4j GTFS data loader created
-- ✅ Routing algorithm implemented
-- ✅ Backend integration with fallback
-- ⏳ Pending: Testing and validation (Week 1)
-- ⏳ Pending: PostgreSQL removal (Week 2+)
-
-**Next Steps**:
-1. Start Docker containers
-2. Verify GTFS data loads into Neo4j
-3. Run comparison tests (Neo4j vs PostgreSQL)
-4. Benchmark performance improvements
-5. Fix any bugs found during testing
-6. Document test results
-7. Schedule PostgreSQL removal after successful validation
+Testing guides in `docs/`:
+- `testing-neo4j-migration.md` - Neo4j validation test plan
+- `NEO4J_IMPLEMENTATION_SUMMARY.md` - Migration status

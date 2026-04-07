@@ -27,8 +27,8 @@ services:
       - ./data:/data
 
     environment:
-      PGHOST: ${DB_HOST}
-      PGPORT: ${DB_PORT}
+      PGHOST: db
+      PGPORT: 5432
       PGUSER: ${DB_USER}
       PGPASSWORD: ${DB_PASSWORD}
       PGDATABASE: ${DB_NAME}
@@ -45,12 +45,11 @@ services:
         sh -c "gtfs-to-sql /gtfs/*.txt | psql -v ON_ERROR_STOP=1"
 
   neo4j:
-    image: neo4j:5-enterprise
+    image: neo4j:5-community
     container_name: gtfs_neo4j
     environment:
       NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
-      NEO4J_INITIAL_SERVER_mode__constraint__validation: "WARN"
     ports:
       - "${NEO4J_BOLT_PORT}:7687"
       - "${NEO4J_HTTP_PORT}:7474"
@@ -83,7 +82,7 @@ services:
       - -c
       - |
         apk add --no-cache unzip curl &&
-        npm install neo4j dotenv &&
+        npm install neo4j-driver dotenv &&
         node load-gtfs-neo4j.js
 
 volumes:

@@ -1,4 +1,4 @@
-import neo4j from 'neo4j';
+import neo4j from 'neo4j-driver';
 
 let driver = null;
 
