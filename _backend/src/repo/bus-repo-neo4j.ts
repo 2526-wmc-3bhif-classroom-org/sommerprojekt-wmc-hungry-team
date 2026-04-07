@@ -15,24 +15,26 @@ export const findRoutes = async (
   const session = getNeo4jSession();
 
   try {
-    // Step 1: Find closest start stop
+    // Step 1: Find closest start stop that has StopTime data
     const startStopResult = await session.run(
-      `MATCH (s:Stop)
-       WITH s, point({latitude: s.latitude, longitude: s.longitude}) as stop_point,
+      `MATCH (s:Stop)<-[:AT_STOP]-(:StopTime)
+       WITH DISTINCT s, 
+            point({latitude: s.latitude, longitude: s.longitude}) as stop_point,
             point({latitude: $lat, longitude: $lon}) as search_point
        RETURN s.id as stop_id, s.name as stop_name
-       ORDER BY distance(stop_point, search_point)
+       ORDER BY point.distance(stop_point, search_point)
        LIMIT 1`,
       { lat: startLat, lon: startLon }
     );
 
-    // Step 2: Find closest end stop
+    // Step 2: Find closest end stop that has StopTime data
     const endStopResult = await session.run(
-      `MATCH (s:Stop)
-       WITH s, point({latitude: s.latitude, longitude: s.longitude}) as stop_point,
+      `MATCH (s:Stop)<-[:AT_STOP]-(:StopTime)
+       WITH DISTINCT s,
+            point({latitude: s.latitude, longitude: s.longitude}) as stop_point,
             point({latitude: $lat, longitude: $lon}) as search_point
        RETURN s.id as stop_id, s.name as stop_name
-       ORDER BY distance(stop_point, search_point)
+       ORDER BY point.distance(stop_point, search_point)
        LIMIT 1`,
       { lat: endLat, lon: endLon }
     );
@@ -48,92 +50,65 @@ export const findRoutes = async (
     // Using recursive Cypher query to find paths up to maxTransfers+1 legs
     const maxLegs = Math.min(maxTransfers + 1, 6); // Cap at 6 legs for performance
 
+    // Get the destination stop name to match any platform at that station
+    const endStopName = endStopResult.records[0].get('stop_name');
+
+    // Simpler routing query that uses string comparison for times
+    // This works because HH:MM:SS format sorts lexicographically for times < 24:00
     const routesResult = await session.run(
       `MATCH (startStop:Stop {id: $startStopId})
-       MATCH (endStop:Stop {id: $endStopId})
        
-       // Find all viable trips departing after the requested time
+       // Find stop times at start stop departing after requested time
        MATCH (startStop)<-[:AT_STOP]-(st1:StopTime)
-       WHERE time(st1.departure_time) >= time($departureTime)
+       WHERE st1.departure_time >= $departureTime
+       AND st1.departure_time < '24:00:00'
        
-       // Find reachable end stop with up to maxLegs
-       WITH startStop, endStop, st1, 
-            [startStop, st1] as current_path, 
-            0 as num_transfers
+       // Find if this trip reaches any stop with the destination name (any platform)
+       MATCH (st1)-[:NEXT_STOP*1..50]->(st_end:StopTime)-[:AT_STOP]->(endStop:Stop)
+       WHERE endStop.name = $endStopName
        
-       CALL {
-         WITH startStop, endStop, st1, current_path, num_transfers, $maxLegs as maxLegs
-         
-         MATCH (st1)-[:NEXT_STOP*0..100]->(st_end:StopTime)-[:AT_STOP]->(endStop)
-         WHERE st_end.trip_id = st1.trip_id
-         
-         RETURN st1 as first_st, st_end as final_st, 1 as legs, 
-                [st1, st_end] as path_nodes, st1.departure_time as departure,
-                st_end.arrival_time as arrival
-         
-         UNION
-         
-         // Handle transfers
-         MATCH (st1)-[:NEXT_STOP*0..100]->(st_transfer:StopTime)
-         WHERE st1.trip_id = st_transfer.trip_id
-         AND num_transfers < $maxLegs - 1
-         
-         WITH st_transfer, startStop, endStop, current_path, num_transfers + 1 as next_transfers,
-              $maxLegs as maxLegs, st1.departure_time as departure
-         
-         MATCH (transfer_stop:Stop)<-[:AT_STOP]-(st_transfer)
-         MATCH (transfer_stop)<-[:AT_STOP]-(st2:StopTime)
-         WHERE st2.trip_id <> st_transfer.trip_id
-         AND time(st2.departure_time) >= time(st_transfer.arrival_time) + duration('PT3M')
-         AND time(st2.departure_time) < time('23:59:59')
-         
-         MATCH (st2)-[:NEXT_STOP*0..100]->(st_end:StopTime)-[:AT_STOP]->(endStop)
-         WHERE st_end.trip_id = st2.trip_id
-         
-         RETURN st1 as first_st, st_end as final_st, next_transfers + 1 as legs,
-                [st_transfer, st2, st_end] as path_nodes, departure,
-                st_end.arrival_time as arrival
-       }
+       // Get route info
+       MATCH (trip:Trip)-[:STOPS_AT]->(st1)
+       MATCH (trip)-[:ON_ROUTE]->(route:Route)
        
-       WITH first_st, final_st, legs, path_nodes, departure, arrival,
-            duration.between(time(departure), time(arrival)).minutes as duration_minutes
-       
-       // Enrich with route information
-       MATCH (trip1:Trip)-[:STOPS_AT]->(first_st)
-       MATCH (trip1)-[:ON_ROUTE]->(route1:Route)
+       WITH st1, st_end, route, startStop, endStop,
+            st1.departure_time as departure,
+            st_end.arrival_time as arrival
        
        RETURN {
-         legs: legs,
-         duration_minutes: duration_minutes,
+         legs: 1,
          departure_time: departure,
          arrival_time: arrival,
-         start_stop_id: $startStopId,
+         start_stop_id: startStop.id,
          start_stop_name: startStop.name,
-         end_stop_id: $endStopId,
+         end_stop_id: endStop.id,
          end_stop_name: endStop.name,
-         route_short_name: route1.short_name,
-         route_long_name: route1.long_name,
-         route_type: route1.type
-       }
+         route_short_name: route.short_name,
+         route_long_name: route.long_name,
+         route_type: route.type
+       } as result
        
-       ORDER BY legs ASC, duration_minutes ASC, departure ASC
+       ORDER BY result.departure_time ASC
        LIMIT 5`,
       {
         startStopId,
-        endStopId,
-        departureTime,
-        maxLegs
+        endStopName,
+        departureTime
       }
     );
 
-    // Format results
+    // Format results - calculate duration from time strings
     return routesResult.records.map(record => {
-      const route = record.get(0);
+      const route = record.get('result');
+      const depTime = formatTime(route.departure_time);
+      const arrTime = formatTime(route.arrival_time);
+      const durationMinutes = calculateDurationMinutes(depTime, arrTime);
+      
       return {
         legs: route.legs,
-        duration_minutes: route.duration_minutes,
-        departure_time: formatTime(route.departure_time),
-        arrival_time: formatTime(route.arrival_time),
+        duration_minutes: durationMinutes,
+        departure_time: depTime,
+        arrival_time: arrTime,
         boarded_at_stop_id: route.start_stop_id,
         boarded_at_stop_name: route.start_stop_name,
         alight_at_stop_id: route.end_stop_id,
@@ -152,7 +127,7 @@ export const findRoutes = async (
 /**
  * Format HH:MM:SS or interval to HH:MM:SS string
  */
-function formatTime(timeValue) {
+function formatTime(timeValue: any): string {
   if (!timeValue) return '00:00:00';
   
   if (typeof timeValue === 'string') {
@@ -172,12 +147,25 @@ function formatTime(timeValue) {
 }
 
 /**
+ * Calculate duration in minutes between two HH:MM:SS time strings
+ */
+function calculateDurationMinutes(departure: string, arrival: string): number {
+  const depParts = departure.split(':').map(Number);
+  const arrParts = arrival.split(':').map(Number);
+  
+  const depMinutes = depParts[0] * 60 + depParts[1];
+  const arrMinutes = arrParts[0] * 60 + arrParts[1];
+  
+  return arrMinutes - depMinutes;
+}
+
+/**
  * Test Neo4j connection
  */
 export const testNeo4jConnection = async () => {
   const session = getNeo4jSession();
   try {
-    const result = await session.run('MATCH (a:Agency) RETURN count(a) as count');
+    const result = await session.run('MATCH (s:Stop) RETURN count(s) as count LIMIT 1');
     return result.records;
   } finally {
     await session.close();

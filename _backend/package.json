@@ -1,7 +1,7 @@
 {
   "name": "_backend",
   "version": "1.0.0",
-  "description": "Backend API for bus stops",
+  "description": "Backend API for SmartHub - bus routes, weather, places",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -17,8 +17,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^4.18.2",
-    "neo4j-driver": "^5.28.1",
-    "pg": "^8.12.0"
+    "neo4j-driver": "^5.28.1"
   },
   "devDependencies": {
     "@types/node": "^25.4.0",
