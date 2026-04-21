@@ -35,6 +35,42 @@ GET http://localhost:3000/api/bus/route?lat_a=48.29083784&lon_a=14.29149548&lat_
 Accept: application/json
 
 ### --------------------------------------------
+### VARIED STOP COMBINATIONS (Direct routes only - no transfers supported yet)
+### --------------------------------------------
+
+### LONGEST DIRECT ROUTE: Biegung (North) → Traun Schloss (South) - ~10.9km on tram 4
+GET http://localhost:3000/api/bus/route?lat_a=48.31246978&lon_a=14.28182961&lat_b=48.21850757&lon_b=14.23845895&departure_time=08:00:00&max_transfers=0
+Accept: application/json
+
+### LONGEST DIRECT ROUTE (reverse): Traun Schloss → Biegung on tram 4
+GET http://localhost:3000/api/bus/route?lat_a=48.21869312&lon_a=14.23844098&lat_b=48.31239211&lon_b=14.28227877&departure_time=08:00:00&max_transfers=0
+Accept: application/json
+
+### Long route: Mühlkreisbahnhof → Traun Schloss (~10.8km) on tram 4
+GET http://localhost:3000/api/bus/route?lat_a=48.31191416&lon_a=14.28033841&lat_b=48.21850757&lon_b=14.23845895&departure_time=09:00:00&max_transfers=0
+Accept: application/json
+
+### Tram 1 full line: Auwiesen → JKU Universität (~9km, 42min)
+GET http://localhost:3000/api/bus/route?lat_a=48.24894624&lon_a=14.30877907&lat_b=48.33485694&lon_b=14.32035835&departure_time=08:30:00&max_transfers=0
+Accept: application/json
+
+### Tram 3: Hauptplatz → Trauner Kreuzung
+GET http://localhost:3000/api/bus/route?lat_a=48.30627394&lon_a=14.28623136&lat_b=48.23385183&lon_b=14.23491959&departure_time=10:00:00&max_transfers=0
+Accept: application/json
+
+### Central city: Taubenmarkt → Goethekreuzung
+GET http://localhost:3000/api/bus/route?lat_a=48.30387188&lon_a=14.28827952&lat_b=48.29576858&lon_b=14.29226804&departure_time=11:00:00&max_transfers=0
+Accept: application/json
+
+### Short tram hop: Remise Kleinmünchen → Wimmerstraße (tram 1)
+GET http://localhost:3000/api/bus/route?lat_a=48.25834883&lon_a=14.32122972&lat_b=48.26135108&lon_b=14.3198553&departure_time=12:00:00&max_transfers=0
+Accept: application/json
+
+### Suburb: Simonystraße → Scharlinz (tram 1)
+GET http://localhost:3000/api/bus/route?lat_a=48.25590265&lon_a=14.32246041&lat_b=48.26842539&lon_b=14.31648662&departure_time=14:00:00&max_transfers=0
+Accept: application/json
+
+### --------------------------------------------
 ### EDGE CASES - SHOULD RETURN 404 (No Route Found)
 ### --------------------------------------------
 
