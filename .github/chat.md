@@ -1157,3 +1157,43 @@ docker volume rm sommerprojekt-wmc-hungry-team_postgres_data
 3. Times after 24:00 stored as strings (e.g., "24:13:00")
 
 ---
+
+## Neo4j Routing Test Case Investigation (2026-04-07)
+
+### Issue
+New test cases added to `test.http` were returning "Not Found" (404) when testing varied stop combinations across the network.
+
+### Root Causes Identified
+
+1. **Direct routes only**: The current Neo4j routing algorithm (`bus-repo-neo4j.ts`) only supports **single-leg (direct) journeys**. It cannot plan routes requiring transfers between lines.
+
+2. **Many stops lack StopTime data**: The Neo4j database contains stops from the GTFS feed that don't have scheduled service. Example: "Linz/Donau Jäger im Tal" (northernmost stop by coordinates) has no StopTime entries - only night bus N82 serves nearby areas.
+
+3. **Direction matters**: Tram lines are unidirectional in the data. Example:
+   - Tram 1: Goes **from Auwiesen TO JKU** ✅
+   - Tram 1: Does NOT go from JKU to Auwiesen ❌ (requires different line or transfer)
+
+4. **Extreme stops require transfers**: The geographically furthest stops (Hitzing in west, Südpark in east, Rohrbach in south, Jäger im Tal in north) are not directly connected by any single line.
+
+### Verified Working Test Routes
+
+| Route | Distance | Line | Notes |
+|-------|----------|------|-------|
+| Biegung → Traun Schloss | ~10.9km | Tram 4 | **Longest direct route** |
+| Traun Schloss → Biegung | ~10.9km | Tram 4 | Reverse direction |
+| Auwiesen → JKU Universität | ~9km | Tram 1 | Full tram line |
+| Hauptplatz → Trauner Kreuzung | ~8km | Tram 3/4 | City center to suburbs |
+
+### Technical Details
+
+- Stops with regular service were found by filtering out night buses (`NOT route.short_name STARTS WITH 'N'`)
+- Longest direct routes found via Neo4j query calculating `point.distance()` between stops connected by NEXT_STOP relationships
+- Only 961 trips have stop_times data loaded (out of 17,534 total trips in GTFS)
+
+### Recommendations
+
+1. **Implement transfer routing** in `bus-repo-neo4j.ts` to handle multi-leg journeys
+2. **Document service coverage** - some stops/areas only have night bus service
+3. **Test cases should use verified coordinates** from stops that have actual scheduled service
+
+---
