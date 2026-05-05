@@ -140,16 +140,28 @@ sommerprojekt-wmc-hungry-team/
 cp .env.example .env
 # Edit .env with your credentials
 
-# 2. Start databases
-docker-compose up
+# 2. Prepare GTFS dataset for Neo4j loader (required once or when data changes)
+unzip -o data/LINZ_AG_GTFS_2026.zip -d data/LINZ_AG_GTFS_2026
 
-# 3. Install backend dependencies
+# 3. Start Neo4j + load GTFS data
+docker compose up -d neo4j
+docker compose run --rm neo4j-loader
+
+# 4. Install backend dependencies
 cd _backend && npm install
 
-# 4. Start backend (new terminal)
+# 5. Start backend (new terminal)
 cd _backend && npm run dev
 
-# 5. Start frontend (new terminal)
+# 6. Start frontend (new terminal)
+# (if backend also runs on :3000, set frontend API URL explicitly)
+NUXT_PUBLIC_API_BASE_URL=http://localhost:3000 cd _frontend/smarthub && npm run dev
+```
+
+By default, frontend API calls use `NUXT_PUBLIC_API_BASE_URL` and fall back to `http://localhost:3000`.
+If Nuxt runs on the same port as the backend in your setup, use a different frontend port or set `NUXT_PUBLIC_API_BASE_URL` explicitly.
+
+```bash
 cd _frontend/smarthub && npm run dev
 ```
 
@@ -366,17 +378,23 @@ Response:
 ```json
 [
   {
-    "legs": 1,
-    "duration_minutes": 15,
+    "legs": [
+      {
+        "board_stop_id": "at:44:40002:0:0",
+        "board_stop_name": "Linz/Donau Saporoshjestraße",
+        "alight_stop_id": "at:44:41126:0:0",
+        "alight_stop_name": "Linz/Donau Ebelsberg",
+        "departure_time": "10:50:00",
+        "arrival_time": "10:51:00",
+        "route_short_name": "19",
+        "route_long_name": "Linz Fernheizkraftwerk - Linz Pichlinger See",
+        "route_type": 3
+      }
+    ],
+    "total_duration_minutes": 1,
     "departure_time": "08:30:00",
     "arrival_time": "08:45:00",
-    "boarded_at_stop_id": "...",
-    "boarded_at_stop_name": "Linz Hbf",
-    "alight_at_stop_id": "...",
-    "alight_at_stop_name": "Destination",
-    "route_short_name": "3",
-    "route_long_name": "Tram 3",
-    "route_type": 0
+    "num_transfers": 0
   }
 ]
 ```
