@@ -1,64 +1,145 @@
 <script setup lang="ts">
-interface Stop {
+import type { BusRouteApiResponse } from '../types/bus'
+import { formatDurationMinutes, formatTime } from '../types/bus'
+
+interface StopView {
   name: string
   time: string
   isTransfer: boolean
   transferInfo?: string
 }
 
-const routeStops: Stop[] = [
-  { name: 'Linz/Donau Jäger im Tal', time: '07:45', isTransfer: false },
-  { name: 'Linz/Donau Hbf', time: '08:02', isTransfer: true, transferInfo: 'Linie 230' },
-  { name: 'Rohrbach B138 B127', time: '08:18', isTransfer: false },
-  { name: 'Rohrbach B127 Wambacherberg', time: '08:30', isTransfer: false },
-]
+const START_PLACE = 'Linz/Donau Saporoshjestraße, Austria'
+const END_PLACE = 'Linz/Donau Ebelsberg, Austria'
+const MAX_TRANSFERS = 2
 
-const travelTime = '45 Min'
-const transferCount = 1
-const arrivalTime = '08:30'
+const loading = ref(true)
+const error = ref('')
+const route = ref<BusRouteApiResponse | null>(null)
+
+const { geocodePlace, get } = useSmarthubApi()
+
+function getCurrentTimeParam() {
+  const now = new Date()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const ss = String(now.getSeconds()).padStart(2, '0')
+  return `${hh}:${mm}:${ss}`
+}
+
+const routeStops = computed<StopView[]>(() => {
+  if (!route.value || route.value.legs.length === 0) return []
+
+  const legs = route.value.legs
+  const stops: StopView[] = [
+    {
+      name: legs[0].board_stop_name,
+      time: formatTime(legs[0].departure_time),
+      isTransfer: false,
+    },
+  ]
+
+  legs.forEach((leg, index) => {
+    const nextLeg = legs[index + 1]
+    stops.push({
+      name: leg.alight_stop_name,
+      time: formatTime(leg.arrival_time),
+      isTransfer: Boolean(nextLeg),
+      transferInfo: nextLeg ? `Linie ${nextLeg.route_short_name}` : undefined,
+    })
+  })
+
+  return stops
+})
+
+const travelTime = computed(() => route.value ? formatDurationMinutes(route.value.total_duration_minutes) : '-')
+const transferCount = computed(() => route.value?.num_transfers ?? 0)
+const arrivalTime = computed(() => route.value ? formatTime(route.value.arrival_time) : '--:--')
+
+onMounted(async () => {
+  try {
+    const [start, end] = await Promise.all([
+      geocodePlace(START_PLACE),
+      geocodePlace(END_PLACE),
+    ])
+
+    const fetchRoutesAt = (departureTime: string) => {
+      return get<BusRouteApiResponse[]>('/api/bus/route', {
+        lat_a: start.coordinates.lat,
+        lon_a: start.coordinates.lon,
+        lat_b: end.coordinates.lat,
+        lon_b: end.coordinates.lon,
+        departure_time: departureTime,
+        max_transfers: MAX_TRANSFERS,
+      })
+    }
+
+    let routes: BusRouteApiResponse[] = []
+    try {
+      routes = await fetchRoutesAt(getCurrentTimeParam())
+    } catch {
+      // Fallback for times where no immediate trip is available.
+      routes = await fetchRoutesAt('10:50:00')
+    }
+
+    route.value = routes[0] ?? null
+    if (!route.value) {
+      error.value = 'Keine Route gefunden'
+    }
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Routen konnten nicht geladen werden'
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
   <div class="bus-widget">
     <h3 class="bus-widget__title">Route</h3>
+    <div v-if="loading" class="bus-widget__status">Lade Route...</div>
+    <div v-else-if="error" class="bus-widget__status bus-widget__status--error">{{ error }}</div>
+    <template v-else>
+      <div class="bus-widget__route-label">{{ START_PLACE }} → {{ END_PLACE }}</div>
 
-    <div class="bus-widget__timeline">
-      <div class="bus-widget__line"></div>
+      <div class="bus-widget__timeline">
+        <div class="bus-widget__line"></div>
 
-      <div
-        v-for="(stop, index) in routeStops"
-        :key="index"
-        class="bus-widget__stop"
-      >
         <div
-          class="bus-widget__stop-dot"
-          :class="{ 'bus-widget__stop-dot--transfer': stop.isTransfer }"
-        ></div>
-        <div class="bus-widget__stop-info">
-          <div class="bus-widget__stop-name">{{ stop.name }}</div>
-          <div v-if="stop.isTransfer && stop.transferInfo" class="bus-widget__stop-transfer-wrapper">
-            <span class="bus-widget__stop-transfer-badge">Umstieg</span>
-            <span class="bus-widget__stop-transfer">{{ stop.transferInfo }}</span>
+          v-for="(stop, index) in routeStops"
+          :key="index"
+          class="bus-widget__stop"
+        >
+          <div
+            class="bus-widget__stop-dot"
+            :class="{ 'bus-widget__stop-dot--transfer': stop.isTransfer }"
+          ></div>
+          <div class="bus-widget__stop-info">
+            <div class="bus-widget__stop-name">{{ stop.name }}</div>
+            <div v-if="stop.isTransfer && stop.transferInfo" class="bus-widget__stop-transfer-wrapper">
+              <span class="bus-widget__stop-transfer-badge">Umstieg</span>
+              <span class="bus-widget__stop-transfer">{{ stop.transferInfo }}</span>
+            </div>
           </div>
+          <div class="bus-widget__stop-time">{{ stop.time }}</div>
         </div>
-        <div class="bus-widget__stop-time">{{ stop.time }}</div>
       </div>
-    </div>
 
-    <div class="bus-widget__summary">
-      <div class="bus-widget__summary-item">
-        <div class="bus-widget__summary-label">Fahrzeit</div>
-        <div class="bus-widget__summary-value">{{ travelTime }}</div>
+      <div class="bus-widget__summary">
+        <div class="bus-widget__summary-item">
+          <div class="bus-widget__summary-label">Fahrzeit</div>
+          <div class="bus-widget__summary-value">{{ travelTime }}</div>
+        </div>
+        <div class="bus-widget__summary-item">
+          <div class="bus-widget__summary-label">Umstiege</div>
+          <div class="bus-widget__summary-value">{{ transferCount }}</div>
+        </div>
+        <div class="bus-widget__summary-item">
+          <div class="bus-widget__summary-label">Ankunft</div>
+          <div class="bus-widget__summary-value">{{ arrivalTime }}</div>
+        </div>
       </div>
-      <div class="bus-widget__summary-item">
-        <div class="bus-widget__summary-label">Umstiege</div>
-        <div class="bus-widget__summary-value">{{ transferCount }}</div>
-      </div>
-      <div class="bus-widget__summary-item">
-        <div class="bus-widget__summary-label">Ankunft</div>
-        <div class="bus-widget__summary-value">{{ arrivalTime }}</div>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -80,6 +161,21 @@ const arrivalTime = '08:30'
   font-weight: 600;
   color: #374151;
   margin: 0;
+}
+
+.bus-widget__route-label {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-top: -8px;
+}
+
+.bus-widget__status {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.bus-widget__status--error {
+  color: #b91c1c;
 }
 
 .bus-widget__timeline {
