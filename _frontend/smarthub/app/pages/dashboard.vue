@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useSettings } from '../composables/use-settings'
+
+const { preview, clearPreview } = useSettings()
 </script>
 
 <template>
@@ -9,6 +12,24 @@
       <appointments-widget class="dashboard__appointments" />
     </div>
     <div class="dashboard__right">
+      <div v-if="preview" class="route-preview">
+        <div class="route-preview__header">
+          <h3>Route Preview</h3>
+          <button @click="clearPreview">Close</button>
+        </div>
+        <div v-if="Array.isArray(preview.routes) && preview.routes.length>0">
+          <div v-for="(r, idx) in preview.routes" :key="idx" class="route-card">
+            <div><strong>Departure:</strong> {{ r.departure_time }} → <strong>Arrival:</strong> {{ r.arrival_time }}</div>
+            <div><strong>Duration:</strong> {{ r.total_duration_minutes }} minutes</div>
+            <div v-for="(leg, i) in r.legs" :key="i" class="leg">
+              <div>{{ leg.board_stop_name }} → {{ leg.alight_stop_name }} ({{ leg.route_short_name }})</div>
+              <div>{{ leg.departure_time }} → {{ leg.arrival_time }}</div>
+            </div>
+          </div>
+        </div>
+        <div v-else>No routes found</div>
+      </div>
+
       <bus-widget />
     </div>
   </div>
@@ -47,4 +68,8 @@
   display: flex;
   flex-direction: column;
 }
+
+.route-preview { background:#fff; padding:12px; border-radius:8px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06) }
+.route-preview__header { display:flex; justify-content:space-between; align-items:center }
+.route-card { padding:8px; border:1px solid #eee; border-radius:6px; margin-bottom:8px }
 </style>
