@@ -287,3 +287,6 @@ fabric.properties
 .idea/**/azureSettings.xml
 
 # End of https://www.toptal.com/developers/gitignore/api/node,webstorm
+
+data/LINZ_AG_GTFS_2026
+data/OOEVV_GTFS_2026
