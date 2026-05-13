@@ -2,13 +2,13 @@
 import { useSettings } from '../composables/use-settings'
 import { useSmarthubApi } from '../composables/use-smarthub-api'
 
-const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-const selected = ref<number>(1)
+const today = new Date().toISOString().slice(0,10)
+const selectedDate = ref<string>(today)
 
-const { state, getDay, setHomeLocation, addAlarm, addRoutineItem, updateRoutineItem, removeRoutineItem, setPreview } = useSettings()
+const { state, getDay, setHomeLocation, addAlarm, addRoutineItem, updateRoutineItem, removeRoutineItem, removeAlarm, setPreview } = useSettings()
 const { geocodePlace, get } = useSmarthubApi()
 
-const dayKey = computed(() => String(selected.value))
+const dayKey = computed(() => selectedDate.value)
 const daySettings = computed(() => getDay(dayKey.value))
 
 const homeLocation = ref(state.value.homeLocation ?? '')
