@@ -2,6 +2,7 @@
 import { useSettings } from '../composables/use-settings'
 import { useSmarthubApi } from '../composables/use-smarthub-api'
 import DatePicker from '../components/date-picker.vue'
+import DatePickerPopup from '../components/date-picker-popup.vue'
 
 const today = new Date().toISOString().slice(0,10)
 const selectedDate = ref<string>(today)
@@ -57,7 +58,7 @@ async function calculateRouteFor(item) {
 
       <div class="day-selector">
         <label>Day</label>
-        <DatePicker v-model="selectedDate" />
+        <DatePickerPopup v-model="selectedDate" />
       </div>
 
       <section>
