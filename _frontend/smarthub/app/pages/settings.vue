@@ -135,7 +135,7 @@ button {
 }
 
 /* Back button should look like primary action buttons */
-.back-btn { margin-bottom: 12px; }
+.back-btn { margin-bottom: 12px; display: inline-flex; align-self: flex-start; width: auto; }
 
 /* Constrain home location input width so it doesn't span the entire screen */
 .home-input { max-width: 560px; width: 100%; display: block }
