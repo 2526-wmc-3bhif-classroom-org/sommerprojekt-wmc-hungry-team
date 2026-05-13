@@ -85,7 +85,7 @@ export function useSettings() {
     save(state.value)
   }
 
-  function addRoutineItem(dayKey: string, title = 'New', time = '10:00', location?: string) {
+  function addRoutineItem(dayKey: string, title = 'Title', time = '10:00', location?: string) {
     ensureDay(dayKey)
     const item: RoutineItem = { id: crypto.randomUUID(), title, time, location }
     state.value.days[dayKey].routine.push(item)
