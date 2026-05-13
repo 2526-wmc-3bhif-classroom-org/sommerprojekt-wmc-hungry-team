@@ -66,6 +66,7 @@ async function calculateRouteFor(item) {
         <div v-for="alarm in daySettings.alarms" :key="alarm.id" class="alarm-row">
           <input v-model="alarm.time" type="time" />
           <label><input type="checkbox" v-model="alarm.repeat" /> Repeat</label>
+          <button class="delete-btn" @click.prevent="removeAlarm(dayKey, alarm.id)" aria-label="Delete alarm">✕</button>
         </div>
         <button @click="addNewAlarm">Add alarm</button>
       </section>
@@ -77,6 +78,7 @@ async function calculateRouteFor(item) {
           <input v-model="item.title" placeholder="Title" />
           <input v-model="item.location" placeholder="Optional location" />
           <button @click.prevent="() => calculateRouteFor(item)">Calc route</button>
+          <button class="delete-btn" @click.prevent="removeRoutineItem(dayKey, item.id)" aria-label="Delete routine item">✕</button>
         </div>
         <button @click="addNewRoutine">Add routine item</button>
       </section>
