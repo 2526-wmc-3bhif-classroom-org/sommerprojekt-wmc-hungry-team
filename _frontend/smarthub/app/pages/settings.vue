@@ -98,14 +98,14 @@ async function calculateRouteFor(item) {
 }
 
 .settings-left {
-  width: 720px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: #ffffff;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .settings-right {
