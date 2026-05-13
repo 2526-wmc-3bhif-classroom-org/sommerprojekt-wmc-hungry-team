@@ -18,6 +18,6 @@
 .content {
   flex: 1;
   padding: 24px;
-  overflow: hidden;
+  overflow: auto;
 }
 </style>
