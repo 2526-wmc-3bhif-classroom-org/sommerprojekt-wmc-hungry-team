@@ -89,10 +89,16 @@ async function calculateRouteFor(item) {
 </template>
 
 <style scoped>
-.settings-page { display:flex; gap:20px; padding:20px }
-.settings-left { width:420px; display:flex; flex-direction:column; gap:12px }
-.settings-right { flex:1; background:#fff; padding:16px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.06) }
+.settings-page { display:flex; justify-content:center; padding:32px; }
+.settings-left { width:720px; display:flex; flex-direction:column; gap:16px; background: #ffffff; padding:24px; border-radius:12px; box-shadow:0 8px 24px rgba(15,23,42,0.06); }
+.settings-right { display:none }
+.day-selector { display:flex; flex-direction:column; gap:6px }
+input[type="text"], input[type="time"], input[type="date"] { padding:8px 10px; border-radius:8px; border:1px solid #e5e7eb }
+button { padding:8px 12px; border-radius:8px; border:none; background:#3b82f6; color:white; cursor:pointer }
+button:disabled { opacity:0.6 }
 .alarm-row, .routine-row { display:flex; gap:8px; align-items:center; margin-bottom:8px }
+.delete-btn { background: transparent; color:#ef4444; border:1px solid #fee2e2; padding:6px 8px; border-radius:6px; font-weight:700; }
+.delete-btn:hover { background:#fee2e2 }
 .route-card { padding:8px; border:1px solid #eee; border-radius:6px; margin-bottom:8px }
 .error { color: #b91c1c }
 </style>
