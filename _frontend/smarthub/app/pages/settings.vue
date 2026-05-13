@@ -89,8 +89,8 @@ async function calculateRouteFor(item) {
 </template>
 
 <style scoped>
-.settings-page { display:flex; justify-content:center; padding:32px; }
-.settings-left { width:720px; display:flex; flex-direction:column; gap:16px; background: #ffffff; padding:24px; border-radius:12px; box-shadow:0 8px 24px rgba(15,23,42,0.06); }
+.settings-page { display:flex; justify-content:center; padding:32px; align-items:flex-start }
+.settings-left { width:720px; display:flex; flex-direction:column; gap:16px; background: #ffffff; padding:24px; border-radius:12px; box-shadow:0 8px 24px rgba(15,23,42,0.06); max-height: calc(100vh - 80px); overflow: auto; }
 .settings-right { display:none }
 .day-selector { display:flex; flex-direction:column; gap:6px }
 input[type="text"], input[type="time"], input[type="date"] { padding:8px 10px; border-radius:8px; border:1px solid #e5e7eb }
