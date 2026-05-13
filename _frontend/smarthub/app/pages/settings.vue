@@ -82,10 +82,7 @@ async function calculateRouteFor(item) {
       </section>
     </div>
 
-    <!-- Preview moved to Dashboard -->
-    <div class="settings-right">
-      <p>Route preview opens on the dashboard after clicking "Calc route".</p>
-    </div>
+    <div class="settings-right"></div>
   </div>
 </template>
 
