@@ -53,7 +53,7 @@ async function calculateRouteFor(item) {
       <button class="back-btn" @click="navigateTo('/dashboard')">Back to Dashboard</button>
       <h2>Settings</h2>
       <label>Home location</label>
-      <input v-model="homeLocation" placeholder="e.g. Home address or 'Linz'" />
+      <input class="home-input" v-model="homeLocation" placeholder="e.g. Home address or 'Linz'" />
 
       <hr />
 
@@ -134,15 +134,11 @@ button {
   cursor: pointer;
 }
 
-.back-btn {
-  background: transparent;
-  color: #374151;
-  border: 1px solid #e5e7eb;
-  padding: 6px 10px;
-  border-radius: 6px;
-  align-self: flex-start;
-  margin-bottom: 8px;
-}
+/* Back button should look like primary action buttons */
+.back-btn { margin-bottom: 12px; }
+
+/* Constrain home location input width so it doesn't span the entire screen */
+.home-input { max-width: 560px; width: 100%; display: block }
 
 button:disabled {
   opacity: 0.6
