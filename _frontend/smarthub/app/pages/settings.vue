@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useSettings } from '../composables/use-settings'
 import { useSmarthubApi } from '../composables/use-smarthub-api'
+import DatePicker from '../components/date-picker.vue'
 
 const today = new Date().toISOString().slice(0,10)
 const selectedDate = ref<string>(today)
@@ -56,9 +57,7 @@ async function calculateRouteFor(item) {
 
       <div class="day-selector">
         <label>Day</label>
-        <select v-model.number="selected">
-          <option v-for="(d, i) in days" :key="i" :value="i">{{ d }}</option>
-        </select>
+        <DatePicker v-model="selectedDate" />
       </div>
 
       <section>
