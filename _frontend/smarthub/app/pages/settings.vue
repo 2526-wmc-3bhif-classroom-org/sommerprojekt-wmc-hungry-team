@@ -50,6 +50,7 @@ async function calculateRouteFor(item) {
 <template>
   <div class="settings-page">
     <div class="settings-left">
+      <button class="back-btn" @click="navigateTo('/dashboard')">Back to Dashboard</button>
       <h2>Settings</h2>
       <label>Home location</label>
       <input v-model="homeLocation" placeholder="e.g. Home address or 'Linz'" />
@@ -77,9 +78,7 @@ async function calculateRouteFor(item) {
           <input v-model="item.time" type="time" />
           <input v-model="item.title" placeholder="Title" />
           <input v-model="item.location" placeholder="Optional location" />
-          <button @click.prevent="() => calculateRouteFor(item)">Calc route</button>
-          <button class="delete-btn" @click.prevent="removeRoutineItem(dayKey, item.id)"
-            aria-label="Delete routine item">✕</button>
+          <button class="delete-btn" @click.prevent="removeRoutineItem(dayKey, item.id)" aria-label="Delete routine item">✕</button>
         </div>
         <button @click="addNewRoutine">Add routine item</button>
       </section>
@@ -132,7 +131,17 @@ button {
   border: none;
   background: #3b82f6;
   color: white;
-  cursor: pointer
+  cursor: pointer;
+}
+
+.back-btn {
+  background: transparent;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  border-radius: 6px;
+  align-self: flex-start;
+  margin-bottom: 8px;
 }
 
 button:disabled {
