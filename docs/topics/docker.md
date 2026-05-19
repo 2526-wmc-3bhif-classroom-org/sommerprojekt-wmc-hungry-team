@@ -8,6 +8,7 @@ The project is fully dockerized:
 - **neo4j-loader**: one-shot GTFS importer (runs on demand)
 - **backend**: Express API
 - **frontend**: Nuxt UI
+- **smarthub_data**: persistent volume for SQLite (`/data/smarthub.sqlite`)
 
 ## Production
 
@@ -28,6 +29,9 @@ docker compose up -d
 ### Frontend API URL
 Set `NUXT_PUBLIC_API_BASE_URL` in `.env` to the **server address** clients will use
 (e.g., `http://192.168.0.10:3000`).
+
+### SQLite storage
+SQLite is stored in `/data/smarthub.sqlite` (volume `smarthub_data`). Override with `DB_PATH` if needed.
 
 ## Development
 

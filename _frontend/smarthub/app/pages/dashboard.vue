@@ -2,6 +2,9 @@
 import { useSettings } from '../composables/use-settings'
 
 const { preview, clearPreview } = useSettings()
+definePageMeta({
+  middleware: 'auth'
+})
 </script>
 
 <template>

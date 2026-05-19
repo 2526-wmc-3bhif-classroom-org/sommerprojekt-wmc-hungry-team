@@ -1,6 +1,6 @@
 # SmartHub - Project Instructions
 
-SmartHub is a Raspberry Pi dashboard web app that shows live transit routes, weather, and a clock on an LCD panel. It is built as a Nuxt frontend with an Express API backend and a Neo4j routing database.
+SmartHub is a Raspberry Pi dashboard web app that shows live transit routes, weather, and a clock on an LCD panel. It is built as a Nuxt frontend with an Express API backend, Neo4j for routing, and SQLite for users/sessions/routines.
 
 **Team**: Arthur Dirnberger, Matthias Darabosch, Benjamin Stoica, Almir Hadzic
 
@@ -11,18 +11,21 @@ SmartHub is a Raspberry Pi dashboard web app that shows live transit routes, wea
 ### Backend
 - Express + TypeScript API (run via `tsx`)
 - Neo4j-based bus routing (no PostgreSQL fallback)
+- SQLite for users, sessions, routines
+- Local auth with server-side sessions
 - Weather forecast via OpenMeteo
 - Geocoding via Google Maps API
+- Optional Google Calendar connect (OAuth)
 
 ### Frontend
 - Nuxt 4 app with:
-  - Landing page (`/`)
+  - Login page (`/login`) and auth guard middleware
   - Dashboard (`/dashboard`) with widgets:
     - Clock
     - Weather
     - Bus route
     - Backend status (labeled “appointments” widget)
-  - Routine settings page (`/routine-settings`) is a placeholder
+  - Routine settings page (`/routine-settings`) with Google connect + logout
 
 ---
 
@@ -40,10 +43,12 @@ SmartHub is a Raspberry Pi dashboard web app that shows live transit routes, wea
 
 ### Database
 - **Neo4j 5 Community**
+- **SQLite** (users, sessions, routines)
 
 ### External APIs
 - **OpenMeteo** (no auth)
 - **Google Geocoding** (`GOOGLE_KEY` required)
+- **Google OAuth** (calendar connect)
 
 ---
 
@@ -54,8 +59,10 @@ sommerprojekt-wmc-hungry-team/
 ├── _backend/
 │   ├── src/
 │   │   ├── app.ts
-│   │   ├── routers/         # bus-route, weather, places
-│   │   ├── repo/            # Neo4j + API integrations
+│   │   ├── db/              # SQLite connection + migrations
+│   │   ├── middleware/      # auth middleware
+│   │   ├── routers/         # bus-route, weather, places, auth, routines
+│   │   ├── repo/            # Neo4j + API integrations + SQLite repos
 │   │   └── utils/           # validation + HTTP helpers
 │   └── package.json
 ├── _frontend/smarthub/
@@ -79,7 +86,7 @@ sommerprojekt-wmc-hungry-team/
 ### Environment
 ```bash
 cp .env.example .env
-# Fill in NEO4J_* and GOOGLE_KEY
+# Fill in NEO4J_*, GOOGLE_KEY, DB_PATH, auth + OAuth envs
 ```
 
 ### Docker (Prod)
@@ -149,6 +156,34 @@ Returns 2-hour interval forecasts from now until end of day (Europe/Vienna).
 **GET /api/places/geocode**  
 Query: `place`  
 Returns coordinates + formatted address using Google Geocoding.
+
+### Auth
+
+**POST /api/auth/register**  
+Body: `name`, `email`, `password`
+
+**POST /api/auth/login**  
+Body: `email`, `password`
+
+**POST /api/auth/logout**  
+Clears the session cookie.
+
+**GET /api/auth/me**  
+Returns current user + Google connect status.
+
+### Routines
+
+**GET /api/routines**  
+List routines for the logged-in user.
+
+**POST /api/routines**  
+Body: `name`, `start_time`/`startTime`, `end_time`/`endTime`, `days`, `config`
+
+**PUT /api/routines/:id**  
+Update a routine.
+
+**DELETE /api/routines/:id**  
+Delete a routine.
 
 ---
 
