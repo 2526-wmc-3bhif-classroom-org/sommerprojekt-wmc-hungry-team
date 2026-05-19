@@ -2,59 +2,50 @@
 
 ## Summary
 
-The DB will have its own container to make it easier to move it elsewhere later, since the smarthub is designed in a way to run on small, resource limited environments where a full db just doesn't have enough space.
+The project is fully dockerized:
 
-## Docker compose file
+- **neo4j**: graph database for routing
+- **neo4j-loader**: one-shot GTFS importer (runs on demand)
+- **backend**: Express API
+- **frontend**: Nuxt UI
 
-```dockerfile
-services:
-  db:
-    image: postgis/postgis:16-3.4-alpine
-    container_name: gtfs_db
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "${DB_PORT}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+## Production
 
-  loader:
-    image: node:20-alpine
-    container_name: gtfs_loader
-    depends_on:
-      db:
-        condition: service_healthy
+```bash
+cp .env.example .env
+unzip -o data/LINZ_AG_GTFS_2026.zip -d data/LINZ_AG_GTFS_2026
 
-    volumes:
-      - ./data:/data
-
-    environment:
-      PGHOST: ${DB_HOST}
-      PGPORT: ${DB_PORT}
-      PGUSER: ${DB_USER}
-      PGPASSWORD: ${DB_PASSWORD}
-      PGDATABASE: ${DB_NAME}
-
-    entrypoint:
-      - sh
-      - -c
-      - |
-        apk add --no-cache unzip postgresql-client &&
-        npm install -g gtfs-via-postgres &&
-        mkdir /gtfs &&
-        unzip /data/LINZ_AG_GTFS_2026.zip -d /gtfs &&
-        sed -i 's/,"DE",/,"de",/g' /gtfs/feed_info.txt &&
-        sh -c "gtfs-to-sql /gtfs/*.txt | psql -v ON_ERROR_STOP=1"
-
-volumes:
-  postgres_data:
+docker compose up -d neo4j
+docker compose --profile tools run --rm neo4j-loader
+docker compose up -d
 ```
 
-There are 2 services, the actual db and the loader that imports the data from a given gtfs dataset.
+### Ports
+- Backend: `http://localhost:3000`
+- Frontend: `http://localhost:3001`
+- Neo4j: Bolt `${NEO4J_BOLT_PORT:-7687}`, HTTP `${NEO4J_HTTP_PORT:-7474}`
+
+### Frontend API URL
+Set `NUXT_PUBLIC_API_BASE_URL` in `.env` to the **server address** clients will use
+(e.g., `http://192.168.0.10:3000`).
+
+## Development
+
+Use the dev override for live reload:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up
+```
+
+This runs:
+- `tsx watch` for the backend
+- `nuxt dev` for the frontend
+
+## Neo4j Loader
+
+The loader is under a **tools profile** so it does not run on every `up`.
+Run it explicitly when GTFS data changes:
+
+```bash
+docker compose --profile tools run --rm neo4j-loader
+```
