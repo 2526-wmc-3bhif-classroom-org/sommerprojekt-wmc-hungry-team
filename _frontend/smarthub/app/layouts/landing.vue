@@ -15,6 +15,6 @@
 
   font-family: 'Segoe UI', Arial, sans-serif;
 
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  background: linear-gradient(135deg, #4889f3, #6466db);
 }
 </style>
