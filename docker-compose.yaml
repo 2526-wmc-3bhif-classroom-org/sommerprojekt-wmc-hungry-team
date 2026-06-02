@@ -79,6 +79,11 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-3001}:3000"
+    command: >
+      sh -c "
+        echo 'Frontend erreichbar unter: http://localhost:${FRONTEND_PORT:-3001}';
+        node .output/server/index.mjs
+      "
     restart: unless-stopped
 
 volumes:

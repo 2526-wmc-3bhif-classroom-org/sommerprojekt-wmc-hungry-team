@@ -93,7 +93,9 @@ async function calculateRouteFor(item) {
   display: flex;
   justify-content: center;
   padding: 32px;
-  align-items: flex-start
+  align-items: flex-start;
+  min-height: 100vh;
+  overflow-y: auto;
 }
 
 .settings-left {
