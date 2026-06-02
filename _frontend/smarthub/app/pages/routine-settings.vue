@@ -1,8 +1,4 @@
 <script setup lang="ts">
-definePageMeta({
-  middleware: 'auth'
-})
-
 const { fetchMe, logout } = useSmarthubApi()
 const googleConnected = ref(false)
 const googleEmail = ref<string | null>(null)

@@ -1,16 +1,12 @@
 <script setup lang="ts">
 definePageMeta({
   layout: 'landing',
-  middleware: 'auth'
-})
-
-onMounted(async () => {
-  await navigateTo('/dashboard')
+  middleware: ['redirect-dashboard']
 })
 </script>
 
 <template>
-  <div class="home__status">Lade Dashboard…</div>
+  <div class="home__status">Weiterleitung…</div>
 </template>
 
 <style scoped>
