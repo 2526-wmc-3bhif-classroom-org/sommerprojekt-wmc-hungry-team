@@ -4,7 +4,7 @@
       <NuxtLink class="header__brand" to="/dashboard">SmartHub</NuxtLink>
       <nav class="header__nav">
         <NuxtLink class="header__link" to="/dashboard">Dashboard</NuxtLink>
-        <NuxtLink class="header__link" to="/routine-settings">Einstellungen</NuxtLink>
+        <NuxtLink class="header__link" to="/settings">Einstellungen</NuxtLink>
       </nav>
     </header>
     <main class="content">

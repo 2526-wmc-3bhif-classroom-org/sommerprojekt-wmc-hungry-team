@@ -30,7 +30,11 @@ function emptyDay(): DaySettings {
   return { alarms: [], routine: [] }
 }
 
-function load(): Settings {
+function loadFromStorage(): Settings {
+  if (typeof localStorage === 'undefined') {
+    return { days: {} }
+  }
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { days: {} }
@@ -42,14 +46,21 @@ function load(): Settings {
 }
 
 function save(s: Settings) {
+  if (typeof localStorage === 'undefined') return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
 }
 
 // Shared, module-level state so multiple components see the same preview
-const state = ref<Settings>(load())
+const state = ref<Settings>({ days: {} })
 const preview = ref<any | null>(null)
+let hydrated = false
 
 export function useSettings() {
+  if (!hydrated && typeof localStorage !== 'undefined') {
+    state.value = loadFromStorage()
+    hydrated = true
+  }
+
   function ensureDay(dayKey: string) {
     if (!state.value.days[dayKey]) state.value.days[dayKey] = emptyDay()
   }

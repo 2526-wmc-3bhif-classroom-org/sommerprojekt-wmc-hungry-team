@@ -289,7 +289,7 @@ router.get('/api/auth/google/callback', async (req: Request, res: Response) => {
     });
 
     const redirectBase = process.env.FRONTEND_BASE_URL || 'http://localhost:3001';
-    res.redirect(`${redirectBase}/routine-settings?google=connected`);
+    res.redirect(`${redirectBase}/settings?google=connected`);
   } catch (e) {
     console.error('Google callback error:', e);
     res.status(500).json({ error: 'Internal server error' });

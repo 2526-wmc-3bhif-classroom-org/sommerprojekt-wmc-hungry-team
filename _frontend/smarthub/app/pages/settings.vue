@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { useSettings } from '../composables/use-settings'
 import { useSmarthubApi } from '../composables/use-smarthub-api'
-import DatePicker from '../components/date-picker.vue'
 import DatePickerPopup from '../components/date-picker-popup.vue'
+
+definePageMeta({
+  alias: ['/routine-settings'],
+})
 
 const today = new Date().toISOString().slice(0, 10)
 const selectedDate = ref<string>(today)
 
 const { state, getDay, setHomeLocation, addAlarm, addRoutineItem, updateRoutineItem, removeRoutineItem, removeAlarm, setPreview } = useSettings()
-const { geocodePlace, get } = useSmarthubApi()
+const { geocodePlace, get, fetchMe, logout } = useSmarthubApi()
 
 const dayKey = computed(() => selectedDate.value)
 const daySettings = computed(() => getDay(dayKey.value))
@@ -16,8 +19,40 @@ const daySettings = computed(() => getDay(dayKey.value))
 const homeLocation = ref(state.value.homeLocation ?? '')
 watch(homeLocation, (v) => setHomeLocation(v))
 
+const googleConnected = ref(false)
+const googleEmail = ref<string | null>(null)
+const statusMessage = ref('')
+const loadingStatus = ref(true)
+
+const config = useRuntimeConfig()
+const apiBase = String(config.public.apiBaseUrl || '').replace(/\/$/, '')
+const route = useRoute()
+
 function addNewAlarm() { addAlarm(dayKey.value) }
 function addNewRoutine() { addRoutineItem(dayKey.value) }
+
+const refreshGoogleStatus = async () => {
+  loadingStatus.value = true
+  try {
+    const me = await fetchMe()
+    googleConnected.value = me.googleConnected
+    googleEmail.value = me.googleEmail
+  } catch {
+    statusMessage.value = 'Status konnte nicht geladen werden'
+  } finally {
+    loadingStatus.value = false
+  }
+}
+
+const connectGoogle = () => {
+  statusMessage.value = ''
+  window.location.href = `${apiBase}/api/auth/google/connect`
+}
+
+const handleLogout = async () => {
+  await logout()
+  await navigateTo('/login')
+}
 
 async function calculateRouteFor(item) {
   if (!homeLocation.value) { alert('Please set a Home location first'); return }
@@ -45,6 +80,13 @@ async function calculateRouteFor(item) {
     alert(e instanceof Error ? e.message : String(e))
   }
 }
+
+onMounted(async () => {
+  await refreshGoogleStatus()
+  if (route.query.google === 'connected') {
+    statusMessage.value = 'Google-Konto verbunden'
+  }
+})
 </script>
 
 <template>
@@ -82,6 +124,30 @@ async function calculateRouteFor(item) {
         </div>
         <button @click="addNewRoutine">Add routine item</button>
       </section>
+
+      <hr />
+
+      <section>
+        <h3>Google Kalender</h3>
+        <p v-if="loadingStatus">Status wird geladen…</p>
+        <p v-else-if="googleConnected">
+          Verbunden{{ googleEmail ? `: ${googleEmail}` : '' }}
+        </p>
+        <p v-else>Nicht verbunden</p>
+
+        <button type="button" @click="connectGoogle">
+          {{ googleConnected ? 'Google neu verbinden' : 'Google verbinden' }}
+        </button>
+      </section>
+
+      <section>
+        <h3>Konto</h3>
+        <button class="button-secondary" type="button" @click="handleLogout">
+          Abmelden
+        </button>
+      </section>
+
+      <p v-if="statusMessage" class="settings-status">{{ statusMessage }}</p>
     </div>
 
     <div class="settings-right"></div>
@@ -136,6 +202,10 @@ button {
   cursor: pointer;
 }
 
+.button-secondary {
+  background: #6b7280;
+}
+
 /* Back button should look like primary action buttons */
 .back-btn { margin-bottom: 12px; display: inline-flex; align-self: flex-start; width: auto; }
 
@@ -165,6 +235,10 @@ button:disabled {
 
 .delete-btn:hover {
   background: #fee2e2
+}
+
+.settings-status {
+  color: #2563eb;
 }
 
 .route-card {
