@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettings } from '../composables/use-settings'
 
-const { getDay } = useSettings()
+const { state } = useSettings()
 
-const today = new Date().toISOString().slice(0, 10)
+const currentDayOfWeek = ref(new Date().getDay())
 
 const carRoutine = computed(() => {
-  const daySettings = getDay(today)
-  return daySettings.routines.find(r => r.transportMode === 'car')
+  return state.value.routines.find(r => r.activeDays?.includes(currentDayOfWeek.value) && r.transportMode === 'car')
 })
 
 const destination = computed(() => carRoutine.value?.destination ?? '')

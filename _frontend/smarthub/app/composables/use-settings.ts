@@ -1,40 +1,45 @@
-import { ref, readonly } from 'vue'
+import { ref, readonly, watch } from 'vue'
+
+export type AlarmItem = {
+  id: string
+  time: string
+  enabled: boolean
+}
 
 export type RoutineItem = {
   id: string
   startTime: string
-  alarmTime: string
+  endTime: string
   destination: string
   startAddress: string
   transportMode: 'bus' | 'car'
+  activeDays: number[] // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  alarms: AlarmItem[]
 }
 
-export type DaySettings = {
-  routines: RoutineItem[]
+export type GlobalSettings = {
+  clockType: 'digital' | 'analog'
 }
 
 export type Settings = {
-  days: Record<string, DaySettings>
+  global?: GlobalSettings
+  routines: RoutineItem[]
 }
 
-const STORAGE_KEY = 'smarthub-settings:v2'
-
-function emptyDay(): DaySettings {
-  return { routines: [] }
-}
+const STORAGE_KEY = 'smarthub-settings:v4'
 
 function loadFromStorage(): Settings {
   if (typeof localStorage === 'undefined') {
-    return { days: {} }
+    return { routines: [] }
   }
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { days: {} }
+    if (!raw) return { routines: [] }
     return JSON.parse(raw)
   } catch (e) {
     console.warn('Failed to load settings', e)
-    return { days: {} }
+    return { routines: [] }
   }
 }
 
@@ -43,28 +48,31 @@ function save(s: Settings) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
 }
 
-// Shared, module-level state so multiple components see the same preview
-const state = ref<Settings>({ days: {} })
+export const state = ref<Settings>({ routines: [] })
 const preview = ref<any | null>(null)
 let hydrated = false
+
+watch(state, (newState) => {
+  if (hydrated) {
+    save(newState)
+  }
+}, { deep: true })
 
 export function useSettings() {
   if (!hydrated && typeof localStorage !== 'undefined') {
     state.value = loadFromStorage()
+    if (!state.value.routines) state.value.routines = []
     hydrated = true
   }
 
-  function ensureDay(dayKey: string) {
-    if (!state.value.days[dayKey]) state.value.days[dayKey] = emptyDay()
+  function getGlobalSettings() {
+    if (!state.value.global) {
+      state.value.global = { clockType: 'digital' }
+    }
+    return state.value.global
   }
 
-  function getDay(dayKey: string) {
-    ensureDay(dayKey)
-    return state.value.days[dayKey]
-  }
-
-  function addRoutineItem(dayKey: string) {
-    ensureDay(dayKey)
+  function addRoutineItem() {
     const now = new Date()
     const hh = String(now.getHours()).padStart(2, '0')
     const mm = String(now.getMinutes()).padStart(2, '0')
@@ -73,36 +81,33 @@ export function useSettings() {
     const item: RoutineItem = {
       id: crypto.randomUUID(),
       startTime: currentTime,
-      alarmTime: currentTime,
+      endTime: currentTime,
       destination: '',
       startAddress: '',
-      transportMode: 'bus'
+      transportMode: 'bus',
+      activeDays: [1, 2, 3, 4, 5], // Default to Mon-Fri
+      alarms: []
     }
-    state.value.days[dayKey].routines.push(item)
+    state.value.routines.push(item)
     save(state.value)
     return item
   }
 
-  function updateRoutineItem(dayKey: string, updated: RoutineItem) {
-    ensureDay(dayKey)
-    const idx = state.value.days[dayKey].routines.findIndex(r => r.id === updated.id)
-    if (idx !== -1) state.value.days[dayKey].routines.splice(idx, 1, updated)
+  function updateRoutineItem(updated: RoutineItem) {
+    const idx = state.value.routines.findIndex(r => r.id === updated.id)
+    if (idx !== -1) {
+      state.value.routines[idx] = updated
+    }
     save(state.value)
   }
 
-  function removeRoutineItem(dayKey: string, id: string) {
-    ensureDay(dayKey)
-    state.value.days[dayKey].routines = state.value.days[dayKey].routines.filter(r => r.id !== id)
+  function removeRoutineItem(id: string) {
+    state.value.routines = state.value.routines.filter(r => r.id !== id)
     save(state.value)
   }
 
-  function resetAll() {
-    state.value = { days: {} }
-    save(state.value)
-  }
-
-  function setPreview(data: any) {
-    preview.value = data
+  function setPreview(p: any) {
+    preview.value = p
   }
 
   function clearPreview() {
@@ -110,14 +115,13 @@ export function useSettings() {
   }
 
   return {
-    state: readonly(state),
+    state,
     preview,
-    getDay,
+    getGlobalSettings,
     addRoutineItem,
     updateRoutineItem,
     removeRoutineItem,
-    resetAll,
     setPreview,
-    clearPreview,
+    clearPreview
   }
 }

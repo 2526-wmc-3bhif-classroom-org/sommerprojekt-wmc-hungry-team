@@ -116,11 +116,22 @@ onBeforeUnmount(() => {
 
 .autocomplete-input {
   width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
   border: 1px solid #e5e7eb;
+  background: #f9fafb;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #111827;
+  transition: all 0.2s;
+}
+
+.autocomplete-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .autocomplete-input:disabled {

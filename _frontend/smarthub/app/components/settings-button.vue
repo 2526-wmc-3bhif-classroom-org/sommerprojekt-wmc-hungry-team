@@ -1,30 +1,47 @@
 <template>
-  <NuxtLink to="/settings" class="settings-button" aria-label="Einstellungen">
-    ⚙️
-  </NuxtLink>
+  <div class="settings-hover-zone">
+    <NuxtLink to="/settings" class="settings-button" aria-label="Einstellungen">
+      ⚙️
+    </NuxtLink>
+  </div>
 </template>
 
 <script setup lang="ts">
 </script>
 
 <style scoped>
-.settings-button {
+.settings-hover-zone {
   position: fixed;
-  left: 18px;
-  bottom: 18px;
-  width: 48px;
-  height: 48px;
+  left: 0;
+  bottom: 0;
+  width: 120px;
+  height: 120px;
+  z-index: 50;
+}
+
+.settings-button {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #111827;
   color: white;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(17,24,39,0.35);
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(17,24,39,0.35);
   text-decoration: none;
-  font-size: 20px;
-  z-index: 50;
-  transition: transform 0.2s ease;
+  font-size: 32px;
+  
+  opacity: 0;
+  transform: translateY(20px) scale(0.8);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.settings-button:hover { transform: translateY(-2px); }
+
+.settings-hover-zone:hover .settings-button {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
 </style>

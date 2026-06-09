@@ -71,42 +71,70 @@ onMounted(async () => {
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   padding: 24px;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
 }
 
 .weather-widget__content {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 20px;
+  justify-content: center;
+  gap: 32px;
+  width: 100%;
 }
 
 .weather-widget__status {
-  color: #6b7280;
-  font-size: 0.95rem;
+  color: #9ca3af;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 .weather-widget__status--error {
-  color: #b91c1c;
+  color: #ef4444;
 }
 
 .weather-widget__icon {
-  font-size: 3rem;
+  font-size: 5rem;
   line-height: 1;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
 }
 
 .weather-widget__info {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 
 .weather-widget__temp {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1f2937;
+  font-size: 3.5rem;
+  font-weight: 200;
+  color: #111827;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  text-align: center;
 }
 
 .weather-widget__sky {
-  font-size: 1rem;
+  font-size: 1.15rem;
+  font-weight: 500;
   color: #6b7280;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+  text-align: center;
 }
 </style>

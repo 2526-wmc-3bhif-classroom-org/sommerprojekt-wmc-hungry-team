@@ -1,52 +1,37 @@
 <script setup lang="ts">
-const loading = ref(true)
-const error = ref('')
-const serviceStatus = ref<{
-  backend: string
-  neo4j: 'up' | 'down'
-  timestamp: string
-} | null>(null)
+import { computed } from 'vue'
+import { state } from '../composables/use-settings'
 
-const { fetchServiceStatus } = useSmarthubApi()
+const today = new Date()
+const currentDayOfWeek = computed(() => (today.getDay() + 6) % 7)
 
-const timestampDisplay = computed(() => {
-  if (!serviceStatus.value) return '--'
-  return new Date(serviceStatus.value.timestamp).toLocaleString('de-AT')
-})
-
-onMounted(async () => {
-  try {
-    const response = await fetchServiceStatus()
-    serviceStatus.value = {
-      backend: response.backend,
-      neo4j: response.neo4j,
-      timestamp: response.timestamp,
+const activeAlarms = computed(() => {
+  let alarms: any[] = []
+  
+  for (const r of state.value.routines) {
+    if (r.activeDays?.includes(currentDayOfWeek.value) && r.alarms) {
+      const validAlarms = r.alarms.filter((a: any) => a.enabled)
+      alarms.push(...validAlarms)
     }
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Backend-Status konnte nicht geladen werden'
-  } finally {
-    loading.value = false
   }
+  
+  alarms.sort((a, b) => a.time.localeCompare(b.time))
+  return alarms
 })
 </script>
 
 <template>
   <div class="appointments-widget">
-    <h3 class="appointments-widget__title">Backend Status</h3>
-    <div v-if="loading" class="appointments-widget__status">Lade Status...</div>
-    <div v-else-if="error" class="appointments-widget__status appointments-widget__status--error">{{ error }}</div>
-    <div v-else-if="serviceStatus" class="appointments-widget__list">
-      <div class="appointments-widget__item">
-        <span class="appointments-widget__time">API</span>
-        <span class="appointments-widget__title-text">{{ serviceStatus.backend }}</span>
-      </div>
-      <div class="appointments-widget__item">
-        <span class="appointments-widget__time">Neo4j</span>
-        <span class="appointments-widget__title-text">{{ serviceStatus.neo4j }}</span>
-      </div>
-      <div class="appointments-widget__item">
-        <span class="appointments-widget__time">Zuletzt</span>
-        <span class="appointments-widget__title-text">{{ timestampDisplay }}</span>
+    <h3 class="appointments-widget__title">⏰ Anstehende Wecker (Heute)</h3>
+    <div v-if="activeAlarms.length === 0" class="appointments-widget__status">
+      Keine Wecker für heute aktiviert.
+    </div>
+    <div v-else class="appointments-widget__list">
+      <div v-for="(alarm, idx) in activeAlarms" :key="idx" class="appointments-widget__item">
+        <span class="appointments-widget__time">{{ alarm.time }}</span>
+        <span class="appointments-widget__title-text">
+          <span class="alarm-badge">Aktiv</span>
+        </span>
       </div>
     </div>
   </div>
@@ -81,31 +66,28 @@ onMounted(async () => {
   font-size: 0.95rem;
 }
 
-.appointments-widget__status--error {
-  color: #b91c1c;
-}
-
 .appointments-widget__item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.appointments-widget__item:last-child {
-  border-bottom: none;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
 }
 
 .appointments-widget__time {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #6b7280;
-  min-width: 50px;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #1f2937;
 }
 
-.appointments-widget__title-text {
-  font-size: 1rem;
-  color: #1f2937;
+.alarm-badge {
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 </style>

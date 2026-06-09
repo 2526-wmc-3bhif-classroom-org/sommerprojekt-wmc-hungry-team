@@ -1,14 +1,36 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useSettings } from '../composables/use-settings'
 import CarWidget from '../components/car-widget.vue'
 
-const { preview, clearPreview, getDay } = useSettings()
+const { preview, clearPreview, state } = useSettings()
 
-const today = new Date().toISOString().slice(0, 10)
+const today = ref(new Date().toISOString().slice(0, 10))
+const currentDayOfWeek = ref(new Date().getDay())
+const currentTime = ref('')
+
+function updateTime() {
+  const now = new Date()
+  today.value = now.toISOString().slice(0, 10)
+  currentDayOfWeek.value = now.getDay()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  currentTime.value = `${hh}:${mm}`
+}
+
+let timeInterval: ReturnType<typeof setInterval>
+onMounted(() => {
+  updateTime()
+  timeInterval = setInterval(updateTime, 10000) // check every 10s
+})
+onUnmounted(() => clearInterval(timeInterval))
+
 const activeRoutine = computed(() => {
-  const daySettings = getDay(today)
-  return daySettings.routines[0] // take the first routine for now, or you could do time-based logic
+  return state.value.routines.find(r => 
+    r.activeDays?.includes(currentDayOfWeek.value) && 
+    r.startTime <= currentTime.value && 
+    r.endTime >= currentTime.value
+  )
 })
 
 const transportMode = computed(() => activeRoutine.value?.transportMode)
@@ -64,14 +86,8 @@ const transportMode = computed(() => activeRoutine.value?.transportMode)
   min-width: 320px;
 }
 
-.dashboard__clock {
-  flex: 1.2;
-}
-
-.dashboard__weather {
-  flex: 0.6;
-}
-
+.dashboard__clock,
+.dashboard__weather,
 .dashboard__appointments {
   flex: 1;
 }
