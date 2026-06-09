@@ -22,15 +22,15 @@ const activeAlarms = computed(() => {
 
 <template>
   <div class="appointments-widget">
-    <h3 class="appointments-widget__title">⏰ Anstehende Wecker (Heute)</h3>
+    <h3 class="appointments-widget__title">⏰ Upcoming Alarms (Today)</h3>
     <div v-if="activeAlarms.length === 0" class="appointments-widget__status">
-      Keine Wecker für heute aktiviert.
+      No alarms activated for today.
     </div>
     <div v-else class="appointments-widget__list">
       <div v-for="(alarm, idx) in activeAlarms" :key="idx" class="appointments-widget__item">
         <span class="appointments-widget__time">{{ alarm.time }}</span>
         <span class="appointments-widget__title-text">
-          <span class="alarm-badge">Aktiv</span>
+          <span class="alarm-badge">Active</span>
         </span>
       </div>
     </div>

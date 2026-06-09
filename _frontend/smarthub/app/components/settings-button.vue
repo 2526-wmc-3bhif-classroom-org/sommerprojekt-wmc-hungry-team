@@ -1,6 +1,6 @@
 <template>
   <div class="settings-hover-zone">
-    <NuxtLink to="/settings" class="settings-button" aria-label="Einstellungen">
+    <NuxtLink to="/settings" class="settings-button" aria-label="Settings">
       ⚙️
     </NuxtLink>
   </div>

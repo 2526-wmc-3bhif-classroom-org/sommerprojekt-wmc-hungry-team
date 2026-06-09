@@ -41,10 +41,10 @@ onMounted(async () => {
 
     weather.value = response.forecasts[0] ?? null
     if (!weather.value) {
-      error.value = 'Keine Wetterdaten verfügbar'
+      error.value = 'No weather data available'
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Wetterdaten konnten nicht geladen werden'
+    error.value = e instanceof Error ? e.message : 'Could not load weather data'
   } finally {
     loading.value = false
   }
@@ -53,7 +53,7 @@ onMounted(async () => {
 
 <template>
   <div class="weather-widget">
-    <div v-if="loading" class="weather-widget__status">Lade Wetter...</div>
+    <div v-if="loading" class="weather-widget__status">Loading weather...</div>
     <div v-else-if="error" class="weather-widget__status weather-widget__status--error">{{ error }}</div>
     <div v-else-if="weather" class="weather-widget__content">
       <div class="weather-widget__icon">{{ weatherIcon }}</div>

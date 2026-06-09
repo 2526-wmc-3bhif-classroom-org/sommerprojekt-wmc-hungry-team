@@ -24,7 +24,8 @@ function updateClock() {
   nowSecond.value = now.getSeconds()
   currentDayOfWeek.value = now.getDay()
 
-  currentTimeStr.value = now.toLocaleTimeString('de-AT', {
+  currentTimeStr.value = now.toLocaleTimeString('en-US', {
+    hour12: false,
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -34,7 +35,7 @@ function updateClock() {
   const mm = String(now.getMinutes()).padStart(2, '0')
   rawTime.value = `${hh}:${mm}`
   
-  currentDate.value = now.toLocaleDateString('de-AT', {
+  currentDate.value = now.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',

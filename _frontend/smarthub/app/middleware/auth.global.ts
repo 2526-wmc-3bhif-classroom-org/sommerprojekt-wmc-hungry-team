@@ -10,6 +10,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
   try {
     await $fetch(`${apiBase}/api/auth/me`, {
       credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     })
   } catch {
     return navigateTo('/login')

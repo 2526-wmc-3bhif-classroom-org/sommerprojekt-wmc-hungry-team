@@ -33,16 +33,16 @@ onMounted(async () => {
 })
 
 const ERROR_TRANSLATIONS: Record<string, string> = {
-  'Invalid credentials': 'E-Mail oder Passwort falsch',
-  'Email already registered': 'Diese E-Mail ist bereits registriert',
-  'Password must be at least 8 characters': 'Passwort muss mindestens 8 Zeichen lang sein',
-  'Invalid email format': 'Ungültiges E-Mail-Format',
-  'Internal server error': 'Serverfehler — bitte später erneut versuchen',
+  'Invalid credentials': 'Email or password incorrect',
+  'Email already registered': 'This email is already registered',
+  'Password must be at least 8 characters': 'Password must be at least 8 characters long',
+  'Invalid email format': 'Invalid email format',
+  'Internal server error': 'Server error — please try again later',
 }
 
 function translateError(msg: string): string {
   if (ERROR_TRANSLATIONS[msg]) return ERROR_TRANSLATIONS[msg]
-  if (msg.startsWith('Missing required parameter')) return 'Bitte alle Felder ausfüllen'
+  if (msg.startsWith('Missing required parameter')) return 'Please fill in all fields'
   return msg
 }
 
@@ -57,23 +57,23 @@ function validateFields(): boolean {
   let valid = true
 
   if (mode.value === 'register' && name.value.trim().length === 0) {
-    errors.name = 'Name ist erforderlich'
+    errors.name = 'Name is required'
     valid = false
   }
 
   if (email.value.trim().length === 0) {
-    errors.email = 'E-Mail ist erforderlich'
+    errors.email = 'Email is required'
     valid = false
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
-    errors.email = 'Ungültiges E-Mail-Format'
+    errors.email = 'Invalid email format'
     valid = false
   }
 
   if (password.value.length === 0) {
-    errors.password = 'Passwort ist erforderlich'
+    errors.password = 'Password is required'
     valid = false
   } else if (mode.value === 'register' && password.value.length < 8) {
-    errors.password = 'Passwort muss mindestens 8 Zeichen lang sein'
+    errors.password = 'Password must be at least 8 characters long'
     valid = false
   }
 
@@ -94,7 +94,7 @@ const submit = async () => {
     }
     await router.push('/dashboard')
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
+    const msg = e instanceof Error ? e.message : 'Unknown error'
     const translated = translateError(msg)
 
     // Route specific backend errors to the relevant field
@@ -103,7 +103,7 @@ const submit = async () => {
     } else if (msg === 'Password must be at least 8 characters' || msg === 'Missing required parameter: password') {
       errors.password = translated
     } else if (msg === 'Missing required parameter: name') {
-      errors.name = 'Name ist erforderlich'
+      errors.name = 'Name is required'
     } else {
       errors.general = translated
     }
@@ -117,7 +117,7 @@ const submit = async () => {
   <div class="auth-card">
     <h1 class="auth-title">SmartHub</h1>
     <p class="auth-subtitle">
-      {{ mode === 'login' ? 'Bitte anmelden' : 'Konto erstellen' }}
+      {{ mode === 'login' ? 'Please log in' : 'Create an account' }}
     </p>
 
     <form class="auth-form" @submit.prevent="submit" novalidate>
@@ -135,7 +135,7 @@ const submit = async () => {
         <input
           v-model.trim="email"
           type="email"
-          placeholder="E-Mail"
+          placeholder="Email"
           autocomplete="email"
           :class="{ 'input-error': errors.email }"
         />
@@ -145,7 +145,7 @@ const submit = async () => {
         <input
           v-model="password"
           type="password"
-          placeholder="Passwort"
+          placeholder="Password"
           autocomplete="current-password"
           :class="{ 'input-error': errors.password }"
         />
@@ -153,14 +153,14 @@ const submit = async () => {
       </div>
 
       <button type="submit" :disabled="loading">
-        {{ loading ? 'Bitte warten…' : mode === 'login' ? 'Anmelden' : 'Registrieren' }}
+        {{ loading ? 'Please wait…' : mode === 'login' ? 'Log In' : 'Register' }}
       </button>
     </form>
 
     <p v-if="errors.general" class="auth-error">{{ errors.general }}</p>
 
     <button class="auth-toggle" type="button" @click="mode = mode === 'login' ? 'register' : 'login'; clearErrors()">
-      {{ mode === 'login' ? 'Noch kein Konto? Registrieren' : 'Schon ein Konto? Anmelden' }}
+      {{ mode === 'login' ? 'No account yet? Register' : 'Already have an account? Log in' }}
     </button>
   </div>
 </template>

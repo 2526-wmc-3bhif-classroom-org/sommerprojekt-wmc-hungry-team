@@ -47,7 +47,7 @@ function toggleDay(item: any, dayIndex: number) {
   updateRoutineItem(item)
 }
 
-const daysOfWeek = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
+const daysOfWeek = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
 const googleConnected = ref(false)
 const googleEmail = ref<string | null>(null)
@@ -66,7 +66,7 @@ const refreshGoogleStatus = async () => {
     googleConnected.value = me.googleConnected
     googleEmail.value = me.googleEmail
   } catch {
-    statusMessage.value = 'Status konnte nicht geladen werden'
+    statusMessage.value = 'Could not load status'
   } finally {
     loadingStatus.value = false
   }
@@ -117,7 +117,7 @@ async function calculateRouteFor(item: any) {
 onMounted(async () => {
   await refreshGoogleStatus()
   if (route.query.google === 'connected') {
-    statusMessage.value = 'Google-Konto verbunden'
+    statusMessage.value = 'Google account connected'
   }
 })
 </script>
@@ -128,24 +128,24 @@ onMounted(async () => {
       <div class="settings-page-header">
         <button class="back-btn-premium" @click="router.push('/dashboard')">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-          Zurück zum Dashboard
+          Back to Dashboard
         </button>
-        <h2>Einstellungen</h2>
+        <h2>Settings</h2>
       </div>
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3>🖥️ Dashboard Ansicht</h3>
+          <h3>🖥️ Dashboard View</h3>
         </div>
         <div class="routine-card">
           <div class="routine-card__body" style="padding: 16px 20px;">
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
-                <label class="field-label" style="font-size: 0.95rem; color: #111827; margin: 0; text-transform: none; letter-spacing: normal;">Uhrentyp</label>
+                <label class="field-label" style="font-size: 0.95rem; color: #111827; margin: 0; text-transform: none; letter-spacing: normal;">Clock Type</label>
               </div>
               <select :value="globalSettings.clockType" @change="(e) => getGlobalSettings().clockType = (e.target as HTMLSelectElement).value" class="premium-select" style="min-width: 200px;">
-                <option value="digital">Digital (z.B. 14:30)</option>
-                <option value="analog">Analog (Zifferblatt)</option>
+                <option value="digital">Digital (e.g. 14:30)</option>
+                <option value="analog">Analog (Clock face)</option>
               </select>
             </div>
           </div>
@@ -154,8 +154,8 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3>⏰ Deine Routinen</h3>
-          <button class="add-routine-btn-premium" @click="addNewRoutine">+ Neue Routine</button>
+          <h3>⏰ Your Routines</h3>
+          <button class="add-routine-btn-premium" @click="addNewRoutine">+ New Routine</button>
         </div>
 
         <div v-for="item in routines" :key="item.id" class="routine-card">
@@ -166,20 +166,20 @@ onMounted(async () => {
                 class="segment-btn" 
                 :class="{ active: item.transportMode === 'bus' }"
                 @click="item.transportMode = 'bus'; updateRoutineItem(item)"
-              >🚌 Öffis</button>
+              >🚌 Public Transport</button>
               <button 
                 type="button" 
                 class="segment-btn" 
                 :class="{ active: item.transportMode === 'car' }"
                 @click="item.transportMode = 'car'; updateRoutineItem(item)"
-              >🚗 Auto</button>
+              >🚗 Car</button>
             </div>
-            <button class="delete-routine-btn" @click.prevent="removeRoutineItem(item.id)" aria-label="Delete routine">Löschen</button>
+            <button class="delete-routine-btn" @click.prevent="removeRoutineItem(item.id)" aria-label="Delete routine">Delete</button>
           </div>
 
           <div class="routine-card__body">
             <div class="routine-card__section">
-              <label class="field-label">Aktiv an Tagen</label>
+              <label class="field-label">Active on days</label>
               <div class="days-pill-container">
                 <button 
                   v-for="(dayStr, idx) in daysOfWeek" 
@@ -194,14 +194,14 @@ onMounted(async () => {
             </div>
 
             <div class="routine-card__section">
-              <label class="field-label">Sichtbarkeit auf dem Dashboard</label>
-              <p class="helper-text">Legt fest, in welchem Zeitraum diese Routine angezeigt wird (keine Ankunftszeit).</p>
+              <label class="field-label">Visibility on the Dashboard</label>
+              <p class="helper-text">Determines during which time period this routine is displayed (not an arrival time).</p>
               <div class="routine-card__row" style="align-items: center; gap: 12px; margin-top: 4px;">
                 <TimePicker 
                   :model-value="item.startTime"
                   @update:model-value="(val) => { item.startTime = val; updateRoutineItem(item) }"
                 />
-                <span style="color: #6b7280; font-weight: 500;">bis</span>
+                <span style="color: #6b7280; font-weight: 500;">to</span>
                 <TimePicker 
                   :model-value="item.endTime"
                   @update:model-value="(val) => { item.endTime = val; updateRoutineItem(item) }"
@@ -211,27 +211,27 @@ onMounted(async () => {
 
             <div class="routine-card__section">
               <div class="routine-card__field">
-                <label class="field-label">Start Adresse</label>
+                <label class="field-label">Start Address</label>
                 <AddressAutocomplete 
                   :model-value="item.startAddress" 
                   @update:model-value="(val) => { item.startAddress = val; updateRoutineItem(item) }"
-                  placeholder="z.B. Hauptbahnhof" 
+                  placeholder="e.g. Central Station" 
                 />
               </div>
               <div class="routine-card__field">
-                <label class="field-label">Ziel Adresse</label>
+                <label class="field-label">Destination Address</label>
                 <AddressAutocomplete 
                   :model-value="item.destination" 
                   @update:model-value="(val) => { item.destination = val; updateRoutineItem(item) }"
-                  placeholder="z.B. Meixnerkreuzung" 
+                  placeholder="e.g. City Center" 
                 />
               </div>
             </div>
 
             <div class="routine-card__section">
               <div class="alarms-header">
-                <label class="field-label">Gekoppelte Wecker</label>
-                <button class="add-alarm-btn" @click="addAlarm(item); updateRoutineItem(item)">+ Wecker hinzufügen</button>
+                <label class="field-label">Linked Alarms</label>
+                <button class="add-alarm-btn" @click="addAlarm(item); updateRoutineItem(item)">+ Add Alarm</button>
               </div>
               <div class="alarms-list" v-if="item.alarms && item.alarms.length > 0">
                 <div v-for="alarm in item.alarms" :key="alarm.id" class="alarm-pill">
@@ -250,7 +250,7 @@ onMounted(async () => {
                   <button class="remove-alarm-btn" @click="removeAlarm(item, alarm.id); updateRoutineItem(item)">✕</button>
                 </div>
               </div>
-              <div v-else class="alarms-empty">Keine Wecker gestellt</div>
+              <div v-else class="alarms-empty">No alarms set</div>
             </div>
           </div>
         </div>
@@ -260,22 +260,22 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3>📅 Integrationen & Konto</h3>
+          <h3>📅 Integrations & Account</h3>
         </div>
         
         <div class="routine-card">
           <div class="routine-card__body">
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
-                <label class="field-label">Google Kalender</label>
+                <label class="field-label">Google Calendar</label>
                 <div style="font-size: 0.9rem; color: #4b5563;">
-                  <span v-if="loadingStatus">Lade Status...</span>
-                  <span v-else-if="googleConnected">Verbunden als <b>{{ googleEmail }}</b></span>
-                  <span v-else>Nicht verbunden</span>
+                  <span v-if="loadingStatus">Loading status...</span>
+                  <span v-else-if="googleConnected">Connected as <b>{{ googleEmail }}</b></span>
+                  <span v-else>Not connected</span>
                 </div>
               </div>
               <button class="add-routine-btn-premium" @click="connectGoogle">
-                {{ googleConnected ? 'Neu verbinden' : 'Verbinden' }}
+                {{ googleConnected ? 'Reconnect' : 'Connect' }}
               </button>
             </div>
             
@@ -283,11 +283,11 @@ onMounted(async () => {
             
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
-                <label class="field-label">SmartHub Konto</label>
-                <div style="font-size: 0.9rem; color: #4b5563;">Auf diesem Gerät angemeldet</div>
+                <label class="field-label">SmartHub Account</label>
+                <div style="font-size: 0.9rem; color: #4b5563;">Logged in on this device</div>
               </div>
               <button class="delete-routine-btn" style="border: 1px solid #fee2e2; border-radius: 8px;" @click="handleLogout">
-                Abmelden
+                Logout
               </button>
             </div>
           </div>

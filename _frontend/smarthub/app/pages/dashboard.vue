@@ -65,7 +65,7 @@ const transportMode = computed(() => activeRoutine.value?.transportMode)
       <bus-widget v-if="transportMode === 'bus'" />
       <car-widget v-else-if="transportMode === 'car'" />
       <div v-else class="no-routine-msg">
-        Bitte Routine in den Einstellungen konfigurieren
+        Please configure a routine in the settings
       </div>
     </div>
   </div>

@@ -33,7 +33,7 @@ function toApiError(error: unknown): Error {
     return error
   }
 
-  return new Error('Unerwarteter API-Fehler')
+  return new Error('Unexpected API error')
 }
 
 export function useSmarthubApi() {
@@ -45,13 +45,14 @@ export function useSmarthubApi() {
   const request = async <T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
-    options: { query?: Record<string, QueryValue>; body?: unknown } = {}
+    options: { query?: Record<string, QueryValue>; body?: unknown; headers?: Record<string, string> } = {}
   ) => {
     try {
       return await $fetch<T>(buildUrl(path), {
         method,
         query: options.query,
         body: options.body,
+        headers: options.headers,
         credentials: 'include'
       })
     } catch (error) {
@@ -98,7 +99,14 @@ export function useSmarthubApi() {
   const fetchMe = async () => {
     return request<{ user: { id: string; email: string; name: string }; googleConnected: boolean; googleEmail: string | null }>(
       'GET',
-      '/api/auth/me'
+      '/api/auth/me',
+      {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      } as any
     )
   }
 

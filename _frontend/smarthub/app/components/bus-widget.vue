@@ -38,7 +38,7 @@ const arrivalTime = computed(() => route.value ? formatTime(route.value.arrival_
 
 onMounted(async () => {
   if (!hasStops.value) {
-    error.value = 'Bitte Start- und Ziel-Haltestelle in den Einstellungen konfigurieren'
+    error.value = 'Please configure start and destination stops in the settings'
     loading.value = false
     return
   }
@@ -69,10 +69,10 @@ onMounted(async () => {
 
     route.value = routes[0] ?? null
     if (!route.value) {
-      error.value = 'Keine Route gefunden'
+      error.value = 'No route found'
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Routen konnten nicht geladen werden'
+    error.value = e instanceof Error ? e.message : 'Could not load routes'
   } finally {
     loading.value = false
   }
@@ -82,7 +82,7 @@ onMounted(async () => {
 <template>
   <div class="bus-widget">
     <h3 class="bus-widget__title">Route</h3>
-    <div v-if="loading" class="bus-widget__status">Lade Route...</div>
+    <div v-if="loading" class="bus-widget__status">Loading route...</div>
     <div v-else-if="error" class="bus-widget__status bus-widget__status--error">{{ error }}</div>
     <template v-else>
       <div class="bus-widget__route-label">{{ startPlace }} → {{ endPlace }}</div>
@@ -106,7 +106,7 @@ onMounted(async () => {
                 <span v-if="leg.route_type === 3">🚌</span>
                 <span v-else-if="leg.route_type === 0">🚋</span>
                 <span v-else>🚌</span>
-                Linie {{ leg.route_short_name }}
+                Line {{ leg.route_short_name }}
               </div>
               <div class="bus-widget__connection-time">{{ formatTime(leg.arrival_time) }}</div>
             </div>
@@ -124,15 +124,15 @@ onMounted(async () => {
 
       <div class="bus-widget__summary">
         <div class="bus-widget__summary-item">
-          <div class="bus-widget__summary-label">Fahrzeit</div>
+          <div class="bus-widget__summary-label">Travel time</div>
           <div class="bus-widget__summary-value">{{ travelTime }}</div>
         </div>
         <div class="bus-widget__summary-item">
-          <div class="bus-widget__summary-label">Umstiege</div>
+          <div class="bus-widget__summary-label">Transfers</div>
           <div class="bus-widget__summary-value">{{ transferCount }}</div>
         </div>
         <div class="bus-widget__summary-item">
-          <div class="bus-widget__summary-label">Ankunft</div>
+          <div class="bus-widget__summary-label">Arrival</div>
           <div class="bus-widget__summary-value">{{ arrivalTime }}</div>
         </div>
       </div>

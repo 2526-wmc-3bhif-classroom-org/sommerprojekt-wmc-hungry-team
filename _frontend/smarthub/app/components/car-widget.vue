@@ -16,15 +16,15 @@ const hasDestination = computed(() => destination.value.trim() !== '')
 
 <template>
   <div class="car-widget">
-    <h3 class="car-widget__title">Route (Auto)</h3>
+    <h3 class="car-widget__title">Route (Car)</h3>
     <div v-if="!hasDestination" class="car-widget__status">
-      Bitte Ziel-Adresse in den Einstellungen konfigurieren
+      Please configure destination address in the settings
     </div>
     <template v-else>
-      <div class="car-widget__route-label">Ziel: {{ destination }}</div>
+      <div class="car-widget__route-label">Destination: {{ destination }}</div>
       <div class="car-widget__content">
         <div class="car-widget__icon">🚗</div>
-        <div class="car-widget__message">Fahrtzeit und Verkehr werden hier in Kürze angezeigt.</div>
+        <div class="car-widget__message">Travel time and traffic will be displayed here shortly.</div>
       </div>
     </template>
   </div>
