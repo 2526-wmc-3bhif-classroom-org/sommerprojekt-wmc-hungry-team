@@ -126,6 +126,71 @@ export function validateRequiredString(
 }
 
 /**
+ * Validate email format (basic)
+ */
+export function validateEmail(value: string | undefined): { valid: true; value: string } | ValidationError {
+  if (!value || typeof value !== 'string') {
+    return { valid: false, error: 'Missing required parameter: email' };
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(trimmed)) {
+    return { valid: false, error: 'Invalid email format' };
+  }
+
+  return { valid: true, value: trimmed };
+}
+
+/**
+ * Validate password strength (minimum 8 characters)
+ */
+export function validatePassword(value: string | undefined): { valid: true; value: string } | ValidationError {
+  if (!value || typeof value !== 'string') {
+    return { valid: false, error: 'Missing required parameter: password' };
+  }
+
+  if (value.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters' };
+  }
+
+  return { valid: true, value };
+}
+
+/**
+ * Validate time string in HH:MM format
+ */
+export function validateTimeValue(value: string | undefined, paramName: string): { valid: true; value: string } | ValidationError {
+  if (!value) {
+    return { valid: false, error: `Missing required parameter: ${paramName}` };
+  }
+
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    return { valid: false, error: `${paramName} must be in HH:MM format` };
+  }
+
+  return { valid: true, value };
+}
+
+/**
+ * Validate days of week array (0-6)
+ */
+export function validateDaysOfWeek(values: unknown): { valid: true; value: number[] } | ValidationError {
+  if (!Array.isArray(values)) {
+    return { valid: false, error: 'days must be an array of numbers (0-6)' };
+  }
+
+  const parsed = values.map((day) => Number(day));
+  if (parsed.some((day) => Number.isNaN(day) || day < 0 || day > 6)) {
+    return { valid: false, error: 'days must contain integers between 0 and 6' };
+  }
+
+  const unique = Array.from(new Set(parsed));
+  return { valid: true, value: unique };
+}
+
+/**
  * Map error messages to HTTP status codes
  */
 export function getErrorStatus(error: Error): { status: number; error: string; message?: string } {

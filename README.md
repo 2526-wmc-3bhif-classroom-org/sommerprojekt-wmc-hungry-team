@@ -25,6 +25,7 @@ docker compose up -d
 - Frontend: http://localhost:3001
 
 Set `NUXT_PUBLIC_API_BASE_URL` in `.env` if clients access the server from another host.
+SQLite data is stored at `/data/smarthub.sqlite` (volume `smarthub_data`), override with `DB_PATH` if needed.
 
 ## Docker (Dev)
 
@@ -62,4 +63,18 @@ npm run dev
 cd _frontend/smarthub
 npm install
 NUXT_PUBLIC_API_BASE_URL=http://localhost:3000 npm run dev
+```
+
+## Auth + Google Calendar
+
+```bash
+# Local auth (required)
+SESSION_COOKIE_NAME=smarthub_session
+SESSION_MAX_AGE_DAYS=3650
+
+# Optional Google Calendar connect
+GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_OAUTH_CLIENT_SECRET=your_google_oauth_client_secret
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+FRONTEND_BASE_URL=http://localhost:3001
 ```

@@ -1,21 +1,63 @@
 <script setup lang="ts">
-import { useSettings } from '../composables/use-settings'
-import { useSmarthubApi } from '../composables/use-smarthub-api'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useRuntimeConfig } from '#app'
+import { useSettings } from '../composables/use-settings.js'
+import { useSmarthubApi } from '../composables/use-smarthub-api.js'
+import DatePickerPopup from '../components/date-picker-popup.vue'
 
-const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-const selected = ref<number>(1)
+definePageMeta({
+  alias: ['/routine-settings'],
+})
 
-const { state, getDay, setHomeLocation, addAlarm, addRoutineItem, updateRoutineItem, removeRoutineItem, setPreview } = useSettings()
-const { geocodePlace, get } = useSmarthubApi()
+const router = useRouter()
+const route = useRoute()
 
-const dayKey = computed(() => String(selected.value))
+const today = new Date().toISOString().slice(0, 10)
+const selectedDate = ref<string>(today)
+
+const { state, getDay, setHomeLocation, addAlarm, addRoutineItem, updateRoutineItem, removeRoutineItem, removeAlarm, setPreview } = useSettings()
+const { geocodePlace, get, fetchMe, logout } = useSmarthubApi()
+
+const dayKey = computed(() => selectedDate.value)
 const daySettings = computed(() => getDay(dayKey.value))
 
 const homeLocation = ref(state.value.homeLocation ?? '')
 watch(homeLocation, (v) => setHomeLocation(v))
 
+const googleConnected = ref(false)
+const googleEmail = ref<string | null>(null)
+const statusMessage = ref('')
+const loadingStatus = ref(true)
+
+const config = useRuntimeConfig()
+const apiBase = String(config.public.apiBaseUrl || '').replace(/\/$/, '')
+
 function addNewAlarm() { addAlarm(dayKey.value) }
 function addNewRoutine() { addRoutineItem(dayKey.value) }
+
+const refreshGoogleStatus = async () => {
+  loadingStatus.value = true
+  try {
+    const me = await fetchMe()
+    googleConnected.value = me.googleConnected
+    googleEmail.value = me.googleEmail
+  } catch {
+    statusMessage.value = 'Status konnte nicht geladen werden'
+  } finally {
+    loadingStatus.value = false
+  }
+}
+
+const connectGoogle = () => {
+  statusMessage.value = ''
+  window.location.href = `${apiBase}/api/auth/google/connect`
+}
+
+const handleLogout = async () => {
+  await logout()
+  await router.push('/login')
+}
 
 async function calculateRouteFor(item) {
   if (!homeLocation.value) { alert('Please set a Home location first'); return }
@@ -25,7 +67,7 @@ async function calculateRouteFor(item) {
     const place = await geocodePlace(item.location)
     const home = await geocodePlace(homeLocation.value)
 
-    const departure = item.time.includes(':') && item.time.split(':').length >= 2 ? (item.time.length===5? item.time+':00' : item.time) : item.time+':00'
+    const departure = item.time.includes(':') && item.time.split(':').length >= 2 ? (item.time.length === 5 ? item.time + ':00' : item.time) : item.time + ':00'
 
     const routes = await get('/api/bus/route', {
       lat_a: home.coordinates.lat,
@@ -38,27 +80,33 @@ async function calculateRouteFor(item) {
 
     // Store preview in shared settings and navigate to dashboard
     setPreview({ routes, item, home: home.coordinates, place: place.coordinates })
-    navigateTo('/dashboard')
+    router.push('/dashboard')
   } catch (e) {
     alert(e instanceof Error ? e.message : String(e))
   }
 }
+
+onMounted(async () => {
+  await refreshGoogleStatus()
+  if (route.query.google === 'connected') {
+    statusMessage.value = 'Google-Konto verbunden'
+  }
+})
 </script>
 
 <template>
   <div class="settings-page">
     <div class="settings-left">
+      <button class="back-btn" @click="router.push('/dashboard')">Back to Dashboard</button>
       <h2>Settings</h2>
       <label>Home location</label>
-      <input v-model="homeLocation" placeholder="e.g. Home address or 'Linz'" />
+      <input class="home-input" v-model="homeLocation" placeholder="e.g. Home address or 'Linz'" />
 
       <hr />
 
       <div class="day-selector">
         <label>Day</label>
-        <select v-model.number="selected">
-          <option v-for="(d, i) in days" :key="i" :value="i">{{ d }}</option>
-        </select>
+        <DatePickerPopup v-model="selectedDate" />
       </div>
 
       <section>
@@ -66,6 +114,7 @@ async function calculateRouteFor(item) {
         <div v-for="alarm in daySettings.alarms" :key="alarm.id" class="alarm-row">
           <input v-model="alarm.time" type="time" />
           <label><input type="checkbox" v-model="alarm.repeat" /> Repeat</label>
+          <button class="delete-btn" @click.prevent="removeAlarm(dayKey, alarm.id)" aria-label="Delete alarm">✕</button>
         </div>
         <button @click="addNewAlarm">Add alarm</button>
       </section>
@@ -76,16 +125,37 @@ async function calculateRouteFor(item) {
           <input v-model="item.time" type="time" />
           <input v-model="item.title" placeholder="Title" />
           <input v-model="item.location" placeholder="Optional location" />
-          <button @click.prevent="() => calculateRouteFor(item)">Calc route</button>
+          <button class="delete-btn" @click.prevent="removeRoutineItem(dayKey, item.id)" aria-label="Delete routine item">✕</button>
         </div>
         <button @click="addNewRoutine">Add routine item</button>
       </section>
+
+      <hr />
+
+      <section>
+        <h3>Google Kalender</h3>
+        <p v-if="loadingStatus">Status wird geladen…</p>
+        <p v-else-if="googleConnected">
+          Verbunden{{ googleEmail ? `: ${googleEmail}` : '' }}
+        </p>
+        <p v-else>Nicht verbunden</p>
+
+        <button type="button" @click="connectGoogle">
+          {{ googleConnected ? 'Google neu verbinden' : 'Google verbinden' }}
+        </button>
+      </section>
+
+      <section>
+        <h3>Konto</h3>
+        <button class="button-secondary" type="button" @click="handleLogout">
+          Abmelden
+        </button>
+      </section>
+
+      <p v-if="statusMessage" class="settings-status">{{ statusMessage }}</p>
     </div>
 
-    <!-- Preview moved to Dashboard -->
-    <div class="settings-right">
-      <p>Route preview opens on the dashboard after clicking "Calc route".</p>
-    </div>
+    <div class="settings-right"></div>
   </div>
 </template>
 

@@ -1,6 +1,7 @@
-<script setup>
+<script setup lang="ts">
 definePageMeta({
-  layout: "landing"
+  layout: 'landing',
+  middleware: ['redirect-dashboard']
 })
 </script>
 

@@ -58,9 +58,12 @@ services:
       NEO4J_HOST: neo4j
       NEO4J_PROTOCOL: bolt
       NEO4J_BOLT_PORT: 7687
+      DB_PATH: /data/smarthub.sqlite
     depends_on:
       neo4j:
         condition: service_healthy
+    volumes:
+      - smarthub_data:/data
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     restart: unless-stopped
@@ -69,15 +72,23 @@ services:
     container_name: smarthub_frontend
     build:
       context: ./_frontend/smarthub
-      target: prod
+      target: dev
     environment:
+      NODE_ENV: development
+      NODE_OPTIONS: --max-old-space-size=6000
       NUXT_PUBLIC_API_BASE_URL: ${NUXT_PUBLIC_API_BASE_URL:-http://localhost:3000}
     depends_on:
       - backend
+    volumes:
+      - ./_frontend/smarthub:/app
+      - frontend_node_modules:/app/node_modules
     ports:
       - "${FRONTEND_PORT:-3001}:3000"
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
     restart: unless-stopped
 
 volumes:
   neo4j_data:
   neo4j_logs:
+  smarthub_data:
+  frontend_node_modules:
