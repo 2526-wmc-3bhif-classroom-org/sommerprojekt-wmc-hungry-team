@@ -94,6 +94,18 @@ async function parseCSV(filePath) {
 
 async function loadGTFS() {
   try {
+    // Check if data is already loaded
+    const existingStops = await session.run('MATCH (s:Stop) RETURN count(s) AS count');
+    const stopCount = existingStops.records[0].get('count');
+    const count = typeof stopCount.toNumber === 'function' ? stopCount.toNumber() : Number(stopCount);
+
+    if (count > 0) {
+      console.log(`✓ Neo4j already contains ${count} stops — skipping GTFS import.`);
+      return;
+    }
+
+    console.log('No existing data found — starting GTFS import...');
+
     console.log('Clearing existing data...');
     await session.run('MATCH (n) DETACH DELETE n');
 

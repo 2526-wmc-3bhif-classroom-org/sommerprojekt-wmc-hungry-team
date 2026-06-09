@@ -5,6 +5,7 @@ import { useRuntimeConfig } from '#app'
 import { useSettings } from '../composables/use-settings.js'
 import { useSmarthubApi } from '../composables/use-smarthub-api.js'
 import DatePickerPopup from '../components/date-picker-popup.vue'
+import AddressAutocomplete from '../components/address-autocomplete.vue'
 
 definePageMeta({
   alias: ['/routine-settings'],
@@ -16,14 +17,22 @@ const route = useRoute()
 const today = new Date().toISOString().slice(0, 10)
 const selectedDate = ref<string>(today)
 
-const { state, getDay, setHomeLocation, addAlarm, addRoutineItem, updateRoutineItem, removeRoutineItem, removeAlarm, setPreview } = useSettings()
+const { state, getDay, addRoutineItem, updateRoutineItem, removeRoutineItem, setPreview } = useSettings()
 const { geocodePlace, get, fetchMe, logout } = useSmarthubApi()
 
 const dayKey = computed(() => selectedDate.value)
 const daySettings = computed(() => getDay(dayKey.value))
 
-const homeLocation = ref(state.value.homeLocation ?? '')
-watch(homeLocation, (v) => setHomeLocation(v))
+function addNewRoutine() { addRoutineItem(dayKey.value) }
+
+// Sync alarm time with start time when start time changes, 
+// if user hasn't diverged them (this is a simple approximation, we can also just let them be independent)
+function handleStartTimeChange(item: any, newTime: string) {
+  if (item.startTime === item.alarmTime) {
+    item.alarmTime = newTime
+  }
+  item.startTime = newTime
+}
 
 const googleConnected = ref(false)
 const googleEmail = ref<string | null>(null)
@@ -33,8 +42,7 @@ const loadingStatus = ref(true)
 const config = useRuntimeConfig()
 const apiBase = String(config.public.apiBaseUrl || '').replace(/\/$/, '')
 
-function addNewAlarm() { addAlarm(dayKey.value) }
-function addNewRoutine() { addRoutineItem(dayKey.value) }
+
 
 const refreshGoogleStatus = async () => {
   loadingStatus.value = true
@@ -59,27 +67,32 @@ const handleLogout = async () => {
   await router.push('/login')
 }
 
-async function calculateRouteFor(item) {
-  if (!homeLocation.value) { alert('Please set a Home location first'); return }
-  if (!item.location) { alert('No location set for this routine item'); return }
+async function calculateRouteFor(item: any) {
+  if (!item.destination) { alert('No destination set for this routine item'); return }
+  if (item.transportMode === 'bus' && !item.startAddress) { alert('No start address set for bus route'); return }
 
   try {
-    const place = await geocodePlace(item.location)
-    const home = await geocodePlace(homeLocation.value)
+    const place = await geocodePlace(item.destination)
+    let home
+    if (item.transportMode === 'bus') {
+      home = await geocodePlace(item.startAddress)
+    }
 
-    const departure = item.time.includes(':') && item.time.split(':').length >= 2 ? (item.time.length === 5 ? item.time + ':00' : item.time) : item.time + ':00'
+    const departure = item.startTime.includes(':') && item.startTime.split(':').length >= 2 ? (item.startTime.length === 5 ? item.startTime + ':00' : item.startTime) : item.startTime + ':00'
 
-    const routes = await get('/api/bus/route', {
-      lat_a: home.coordinates.lat,
-      lon_a: home.coordinates.lon,
-      lat_b: place.coordinates.lat,
-      lon_b: place.coordinates.lon,
-      departure_time: departure,
-      max_transfers: 2,
-    })
+    if (item.transportMode === 'bus' && home) {
+      const routes = await get('/api/bus/route', {
+        lat_a: home.coordinates.lat,
+        lon_a: home.coordinates.lon,
+        lat_b: place.coordinates.lat,
+        lon_b: place.coordinates.lon,
+        departure_time: departure,
+        max_transfers: 2,
+      })
 
-    // Store preview in shared settings and navigate to dashboard
-    setPreview({ routes, item, home: home.coordinates, place: place.coordinates })
+      // Store preview in shared settings and navigate to dashboard
+      setPreview({ routes, item, home: home.coordinates, place: place.coordinates })
+    }
     router.push('/dashboard')
   } catch (e) {
     alert(e instanceof Error ? e.message : String(e))
@@ -99,35 +112,63 @@ onMounted(async () => {
     <div class="settings-left">
       <button class="back-btn" @click="router.push('/dashboard')">Back to Dashboard</button>
       <h2>Settings</h2>
-      <label>Home location</label>
-      <input class="home-input" v-model="homeLocation" placeholder="e.g. Home address or 'Linz'" />
-
-      <hr />
 
       <div class="day-selector">
-        <label>Day</label>
+        <label>Tag auswählen</label>
         <DatePickerPopup v-model="selectedDate" />
       </div>
 
-      <section>
-        <h3>Alarms</h3>
-        <div v-for="alarm in daySettings.alarms" :key="alarm.id" class="alarm-row">
-          <input v-model="alarm.time" type="time" />
-          <label><input type="checkbox" v-model="alarm.repeat" /> Repeat</label>
-          <button class="delete-btn" @click.prevent="removeAlarm(dayKey, alarm.id)" aria-label="Delete alarm">✕</button>
+      <section class="routines-section">
+        <h3>⏰ Routinen</h3>
+        <div class="routines-header" v-if="daySettings.routines.length > 0">
+          <div class="header-time">Startzeit</div>
+          <div class="header-time">Wecker</div>
+          <div class="header-dest">Ziel-Adresse</div>
+          <div class="header-start">Start-Adresse</div>
+          <div class="header-mode">Modus</div>
+          <div class="header-action"></div>
         </div>
-        <button @click="addNewAlarm">Add alarm</button>
-      </section>
 
-      <section>
-        <h3>Routine</h3>
-        <div v-for="item in daySettings.routine" :key="item.id" class="routine-row">
-          <input v-model="item.time" type="time" />
-          <input v-model="item.title" placeholder="Title" />
-          <input v-model="item.location" placeholder="Optional location" />
-          <button class="delete-btn" @click.prevent="removeRoutineItem(dayKey, item.id)" aria-label="Delete routine item">✕</button>
+        <div v-for="item in daySettings.routines" :key="item.id" class="routine-row">
+          <input 
+            :value="item.startTime" 
+            @input="(e) => handleStartTimeChange(item, (e.target as HTMLInputElement).value)" 
+            type="time" 
+            class="input-time" 
+            title="Startzeit"
+          />
+          <input v-model="item.alarmTime" type="time" class="input-time" title="Wecker" />
+          <AddressAutocomplete 
+            v-model="item.destination" 
+            placeholder="Ziel (z.B. Meixnerkreuzung)" 
+          />
+          
+          <AddressAutocomplete 
+            v-model="item.startAddress" 
+            placeholder="Start (z.B. Hauptbahnhof)" 
+          />
+
+          <div class="transport-toggle">
+            <button 
+              type="button" 
+              class="toggle-btn" 
+              :class="{ active: item.transportMode === 'bus' }"
+              @click="item.transportMode = 'bus'"
+              title="Bus"
+            >🚌</button>
+            <button 
+              type="button" 
+              class="toggle-btn" 
+              :class="{ active: item.transportMode === 'car' }"
+              @click="item.transportMode = 'car'"
+              title="Auto"
+            >🚗</button>
+          </div>
+
+          <button class="delete-btn" @click.prevent="removeRoutineItem(dayKey, item.id)" aria-label="Delete routine">✕</button>
         </div>
-        <button @click="addNewRoutine">Add routine item</button>
+        
+        <button class="add-routine-btn" @click="addNewRoutine">+ Routine hinzufügen</button>
       </section>
 
       <hr />
@@ -221,12 +262,86 @@ button:disabled {
   opacity: 0.6
 }
 
-.alarm-row,
+.routines-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.routines-header {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.header-time { width: 100px; }
+.header-dest, .header-start { flex: 1; }
+.header-mode { width: 90px; text-align: center; }
+.header-action { width: 32px; }
+
 .routine-row {
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-bottom: 8px
+  background: #f9fafb;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.input-time {
+  width: 100px;
+}
+
+.input-text {
+  min-width: 0;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.opacity-50 {
+  opacity: 0.5;
+  background-color: #f3f4f6;
+}
+
+.transport-toggle {
+  display: flex;
+  background: #e5e7eb;
+  border-radius: 6px;
+  padding: 2px;
+  width: 90px;
+}
+
+.toggle-btn {
+  flex: 1;
+  background: transparent;
+  color: #4b5563;
+  padding: 4px 0;
+  border-radius: 4px;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.toggle-btn.active {
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.add-routine-btn {
+  align-self: flex-start;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px dashed #d1d5db;
+  margin-top: 8px;
+}
+.add-routine-btn:hover {
+  background: #e5e7eb;
 }
 
 .delete-btn {

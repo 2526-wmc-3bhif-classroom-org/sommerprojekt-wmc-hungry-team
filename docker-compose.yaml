@@ -27,8 +27,7 @@ services:
     depends_on:
       neo4j:
         condition: service_healthy
-    profiles:
-      - tools
+
     volumes:
       - ./data:/data
       - ./scripts:/scripts
@@ -44,6 +43,10 @@ services:
       - -c
       - |
         apk add --no-cache unzip curl &&
+        if [ ! -f /data/LINZ_AG_GTFS_2026/stops.txt ]; then
+          echo "Extracting GTFS data..." &&
+          unzip -o /data/LINZ_AG_GTFS_2026.zip -d /data/LINZ_AG_GTFS_2026
+        fi &&
         npm install neo4j-driver dotenv &&
         node load-gtfs-neo4j.js
     restart: "no"
@@ -62,6 +65,8 @@ services:
     depends_on:
       neo4j:
         condition: service_healthy
+      neo4j-loader:
+        condition: service_completed_successfully
     volumes:
       - smarthub_data:/data
     ports:

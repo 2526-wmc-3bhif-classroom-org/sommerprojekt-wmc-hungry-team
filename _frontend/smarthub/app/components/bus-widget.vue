@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { BusRouteApiResponse } from '../types/bus'
 import { formatDurationMinutes, formatTime } from '../types/bus'
+import { useSettings } from '../composables/use-settings'
 
 interface StopView {
   name: string
@@ -9,9 +10,20 @@ interface StopView {
   transferInfo?: string
 }
 
-const START_PLACE = 'Linz/Donau Saporoshjestraße, Austria'
-const END_PLACE = 'Linz/Donau Ebelsberg, Austria'
 const MAX_TRANSFERS = 2
+
+const { state, getDay } = useSettings()
+
+const today = new Date().toISOString().slice(0, 10)
+
+const busRoutine = computed(() => {
+  const daySettings = getDay(today)
+  return daySettings.routines.find(r => r.transportMode === 'bus')
+})
+
+const startPlace = computed(() => busRoutine.value?.startAddress ?? '')
+const endPlace = computed(() => busRoutine.value?.destination ?? '')
+const hasStops = computed(() => startPlace.value.trim() !== '' && endPlace.value.trim() !== '')
 
 const loading = ref(true)
 const error = ref('')
@@ -57,10 +69,16 @@ const transferCount = computed(() => route.value?.num_transfers ?? 0)
 const arrivalTime = computed(() => route.value ? formatTime(route.value.arrival_time) : '--:--')
 
 onMounted(async () => {
+  if (!hasStops.value) {
+    error.value = 'Bitte Start- und Ziel-Haltestelle in den Einstellungen konfigurieren'
+    loading.value = false
+    return
+  }
+
   try {
     const [start, end] = await Promise.all([
-      geocodePlace(START_PLACE),
-      geocodePlace(END_PLACE),
+      geocodePlace(startPlace.value),
+      geocodePlace(endPlace.value),
     ])
 
     const fetchRoutesAt = (departureTime: string) => {
@@ -74,11 +92,10 @@ onMounted(async () => {
       })
     }
 
-    let routes: BusRouteApiResponse[] = []
-    try {
-      routes = await fetchRoutesAt(getCurrentTimeParam())
-    } catch {
-      // Fallback for times where no immediate trip is available.
+    let routes = await fetchRoutesAt(getCurrentTimeParam())
+
+    // Fallback for times where no immediate trip is available
+    if (routes.length === 0) {
       routes = await fetchRoutesAt('10:50:00')
     }
 
@@ -100,7 +117,7 @@ onMounted(async () => {
     <div v-if="loading" class="bus-widget__status">Lade Route...</div>
     <div v-else-if="error" class="bus-widget__status bus-widget__status--error">{{ error }}</div>
     <template v-else>
-      <div class="bus-widget__route-label">{{ START_PLACE }} → {{ END_PLACE }}</div>
+      <div class="bus-widget__route-label">{{ startPlace }} → {{ endPlace }}</div>
 
       <div class="bus-widget__timeline">
         <div class="bus-widget__line"></div>

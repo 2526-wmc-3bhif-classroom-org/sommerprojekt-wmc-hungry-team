@@ -14,11 +14,9 @@
 ```bash
 cp .env.example .env
 # Edit .env (Neo4j + Google API key)
-unzip -o data/LINZ_AG_GTFS_2026.zip -d data/LINZ_AG_GTFS_2026
 
-docker compose up -d neo4j
-docker compose --profile tools run --rm neo4j-loader
 docker compose up -d
+# GTFS data is extracted and loaded into Neo4j automatically on first startup.
 ```
 
 - Backend: http://localhost:3000

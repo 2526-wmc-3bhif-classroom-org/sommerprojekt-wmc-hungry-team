@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { geocodePlace } from '../repo/places-repo.js';
+import { geocodePlace, autocompletePlace } from '../repo/places-repo.js';
 import { validateRequiredString } from '../utils/validation.js';
 
 const router = Router();
@@ -40,6 +40,25 @@ router.get('/api/places/geocode', async (req: Request, res: Response) => {
       });
     }
     
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: e.message 
+    });
+  }
+});
+
+router.get('/api/places/autocomplete', async (req: Request, res: Response) => {
+  try {
+    const qResult = validateRequiredString(req.query.q as string, 'q');
+    if (!qResult.valid) {
+      return res.status(400).json({ error: qResult.error });
+    }
+
+    const result = await autocompletePlace(qResult.value);
+    res.json(result);
+
+  } catch (e: any) {
+    console.error('Autocomplete endpoint error:', e);
     res.status(500).json({ 
       error: 'Internal server error',
       message: e.message 

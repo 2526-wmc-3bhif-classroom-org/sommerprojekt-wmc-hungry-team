@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSmarthubApi } from '../composables/use-smarthub-api.js'
 
@@ -9,7 +9,12 @@ const mode = ref<'login' | 'register'>('login')
 const name = ref('')
 const email = ref('')
 const password = ref('')
-const error = ref('')
+const errors = reactive<{ name: string; email: string; password: string; general: string }>({
+  name: '',
+  email: '',
+  password: '',
+  general: '',
+})
 const loading = ref(false)
 
 definePageMeta({
@@ -27,8 +32,59 @@ onMounted(async () => {
   }
 })
 
+const ERROR_TRANSLATIONS: Record<string, string> = {
+  'Invalid credentials': 'E-Mail oder Passwort falsch',
+  'Email already registered': 'Diese E-Mail ist bereits registriert',
+  'Password must be at least 8 characters': 'Passwort muss mindestens 8 Zeichen lang sein',
+  'Invalid email format': 'Ungültiges E-Mail-Format',
+  'Internal server error': 'Serverfehler — bitte später erneut versuchen',
+}
+
+function translateError(msg: string): string {
+  if (ERROR_TRANSLATIONS[msg]) return ERROR_TRANSLATIONS[msg]
+  if (msg.startsWith('Missing required parameter')) return 'Bitte alle Felder ausfüllen'
+  return msg
+}
+
+function clearErrors() {
+  errors.name = ''
+  errors.email = ''
+  errors.password = ''
+  errors.general = ''
+}
+
+function validateFields(): boolean {
+  let valid = true
+
+  if (mode.value === 'register' && name.value.trim().length === 0) {
+    errors.name = 'Name ist erforderlich'
+    valid = false
+  }
+
+  if (email.value.trim().length === 0) {
+    errors.email = 'E-Mail ist erforderlich'
+    valid = false
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
+    errors.email = 'Ungültiges E-Mail-Format'
+    valid = false
+  }
+
+  if (password.value.length === 0) {
+    errors.password = 'Passwort ist erforderlich'
+    valid = false
+  } else if (mode.value === 'register' && password.value.length < 8) {
+    errors.password = 'Passwort muss mindestens 8 Zeichen lang sein'
+    valid = false
+  }
+
+  return valid
+}
+
 const submit = async () => {
-  error.value = ''
+  clearErrors()
+
+  if (!validateFields()) return
+
   loading.value = true
   try {
     if (mode.value === 'login') {
@@ -38,7 +94,19 @@ const submit = async () => {
     }
     await router.push('/dashboard')
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Login fehlgeschlagen'
+    const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
+    const translated = translateError(msg)
+
+    // Route specific backend errors to the relevant field
+    if (msg === 'Invalid email format' || msg === 'Missing required parameter: email') {
+      errors.email = translated
+    } else if (msg === 'Password must be at least 8 characters' || msg === 'Missing required parameter: password') {
+      errors.password = translated
+    } else if (msg === 'Missing required parameter: name') {
+      errors.name = 'Name ist erforderlich'
+    } else {
+      errors.general = translated
+    }
   } finally {
     loading.value = false
   }
@@ -52,38 +120,46 @@ const submit = async () => {
       {{ mode === 'login' ? 'Bitte anmelden' : 'Konto erstellen' }}
     </p>
 
-    <form class="auth-form" @submit.prevent="submit">
-      <input
-        v-if="mode === 'register'"
-        v-model.trim="name"
-        type="text"
-        placeholder="Name"
-        autocomplete="name"
-        required
-      />
-      <input
-        v-model.trim="email"
-        type="email"
-        placeholder="E-Mail"
-        autocomplete="email"
-        required
-      />
-      <input
-        v-model="password"
-        type="password"
-        placeholder="Passwort"
-        autocomplete="current-password"
-        required
-      />
+    <form class="auth-form" @submit.prevent="submit" novalidate>
+      <div v-if="mode === 'register'" class="auth-field">
+        <input
+          v-model.trim="name"
+          type="text"
+          placeholder="Name"
+          autocomplete="name"
+          :class="{ 'input-error': errors.name }"
+        />
+        <p v-if="errors.name" class="field-error">{{ errors.name }}</p>
+      </div>
+      <div class="auth-field">
+        <input
+          v-model.trim="email"
+          type="email"
+          placeholder="E-Mail"
+          autocomplete="email"
+          :class="{ 'input-error': errors.email }"
+        />
+        <p v-if="errors.email" class="field-error">{{ errors.email }}</p>
+      </div>
+      <div class="auth-field">
+        <input
+          v-model="password"
+          type="password"
+          placeholder="Passwort"
+          autocomplete="current-password"
+          :class="{ 'input-error': errors.password }"
+        />
+        <p v-if="errors.password" class="field-error">{{ errors.password }}</p>
+      </div>
 
       <button type="submit" :disabled="loading">
         {{ loading ? 'Bitte warten…' : mode === 'login' ? 'Anmelden' : 'Registrieren' }}
       </button>
     </form>
 
-    <p v-if="error" class="auth-error">{{ error }}</p>
+    <p v-if="errors.general" class="auth-error">{{ errors.general }}</p>
 
-    <button class="auth-toggle" type="button" @click="mode = mode === 'login' ? 'register' : 'login'">
+    <button class="auth-toggle" type="button" @click="mode = mode === 'login' ? 'register' : 'login'; clearErrors()">
       {{ mode === 'login' ? 'Noch kein Konto? Registrieren' : 'Schon ein Konto? Anmelden' }}
     </button>
   </div>
@@ -118,11 +194,33 @@ const submit = async () => {
   gap: 12px;
 }
 
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
 .auth-form input {
   padding: 12px 14px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.auth-form input.input-error {
+  border-color: #dc2626;
+}
+
+.field-error {
+  color: #dc2626;
+  font-size: 0.8rem;
+  margin: 4px 0 0 4px;
 }
 
 .auth-form button {
@@ -152,3 +250,4 @@ const submit = async () => {
   cursor: pointer;
 }
 </style>
+

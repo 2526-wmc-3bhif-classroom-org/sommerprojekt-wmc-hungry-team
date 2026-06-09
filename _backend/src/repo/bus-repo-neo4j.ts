@@ -41,24 +41,24 @@ export const findRoutes = async (
   try {
     // Step 1: Find closest start stop that has StopTime data
     const startStopResult = await session.run(
-      `MATCH (s:Stop)<-[:AT_STOP]-(:StopTime)
-       WITH DISTINCT s, 
-            point({latitude: s.latitude, longitude: s.longitude}) as stop_point,
-            point({latitude: $lat, longitude: $lon}) as search_point
+      `MATCH (s:Stop)
+       WITH s, point.distance(point({latitude: s.latitude, longitude: s.longitude}), point({latitude: $lat, longitude: $lon})) as dist
+       ORDER BY dist
+       LIMIT 20
+       MATCH (s)<-[:AT_STOP]-(:StopTime)
        RETURN s.id as stop_id, s.name as stop_name
-       ORDER BY point.distance(stop_point, search_point)
        LIMIT 1`,
       { lat: startLat, lon: startLon }
     );
 
     // Step 2: Find closest end stop that has StopTime data
     const endStopResult = await session.run(
-      `MATCH (s:Stop)<-[:AT_STOP]-(:StopTime)
-       WITH DISTINCT s,
-            point({latitude: s.latitude, longitude: s.longitude}) as stop_point,
-            point({latitude: $lat, longitude: $lon}) as search_point
+      `MATCH (s:Stop)
+       WITH s, point.distance(point({latitude: s.latitude, longitude: s.longitude}), point({latitude: $lat, longitude: $lon})) as dist
+       ORDER BY dist
+       LIMIT 20
+       MATCH (s)<-[:AT_STOP]-(:StopTime)
        RETURN s.id as stop_id, s.name as stop_name
-       ORDER BY point.distance(stop_point, search_point)
        LIMIT 1`,
       { lat: endLat, lon: endLon }
     );
@@ -69,6 +69,8 @@ export const findRoutes = async (
 
     const startStopName = startStopResult.records[0].get('stop_name');
     const endStopName = endStopResult.records[0].get('stop_name');
+
+    console.time(`findRoutes: ${startStopName} -> ${endStopName}`);
 
     // Collect routes from all leg counts (direct + transfers)
     const allRoutes: RouteResult[] = [];
@@ -115,15 +117,11 @@ async function findDirectRoutes(
   departureTime: string
 ): Promise<RouteResult[]> {
   const result = await session.run(
-    `MATCH (startStop:Stop {name: $startStopName})<-[:AT_STOP]-(st1:StopTime)
-     WHERE st1.departure_time >= $departureTime
-     AND st1.departure_time < '24:00:00'
+    `MATCH (startStop:Stop {name: $startStopName})<-[:AT_STOP]-(st1:StopTime)<-[:STOPS_AT]-(trip:Trip)-[:ON_ROUTE]->(route:Route)
+     WHERE st1.departure_time >= $departureTime AND st1.departure_time < '24:00:00'
      
-     MATCH (st1)-[:NEXT_STOP*1..50]->(st_end:StopTime)-[:AT_STOP]->(endStop:Stop)
-     WHERE endStop.name = $endStopName
-     
-     MATCH (trip:Trip)-[:STOPS_AT]->(st1)
-     MATCH (trip)-[:ON_ROUTE]->(route:Route)
+     MATCH (trip)-[:STOPS_AT]->(st_end:StopTime)-[:AT_STOP]->(endStop:Stop {name: $endStopName})
+     WHERE st1.stop_sequence < st_end.stop_sequence
      
      RETURN startStop.id as board_stop_id,
             startStop.name as board_stop_name,
@@ -196,37 +194,24 @@ async function findRoutesWithOneTransfer(
   // Use a simpler approach: just check that departure is after arrival
   // The minimum transfer time will be enforced in post-processing
   const result = await session.run(
-    `// First leg: from start to transfer stop
-     MATCH (startStop:Stop {name: $startStopName})<-[:AT_STOP]-(st1:StopTime)
-     WHERE st1.departure_time >= $departureTime
-     AND st1.departure_time < '24:00:00'
+    `MATCH (startStop:Stop {name: $startStopName})<-[:AT_STOP]-(st1:StopTime)<-[:STOPS_AT]-(trip1:Trip)-[:ON_ROUTE]->(route1:Route)
+     WHERE st1.departure_time >= $departureTime AND st1.departure_time < '24:00:00'
      
-     // Follow first trip to a transfer stop
-     MATCH (st1)-[:NEXT_STOP*1..30]->(st1_end:StopTime)-[:AT_STOP]->(transferStop:Stop)
-     MATCH (trip1:Trip)-[:STOPS_AT]->(st1)
-     MATCH (trip1)-[:ON_ROUTE]->(route1:Route)
+     MATCH (trip1)-[:STOPS_AT]->(st1_end:StopTime)-[:AT_STOP]->(transferStop:Stop)
+     WHERE st1.stop_sequence < st1_end.stop_sequence
      
-     // Second leg: from transfer stop to destination (different trip)
-     MATCH (transferStop)<-[:AT_STOP]-(st2:StopTime)
+     WITH startStop, st1, trip1, route1, st1_end, transferStop, $endStopName AS endName, $minTransferTime AS minTransTime
+     
+     MATCH (transferStop)<-[:AT_STOP]-(st2:StopTime)<-[:STOPS_AT]-(trip2:Trip)-[:ON_ROUTE]->(route2:Route)
      WHERE st2.departure_time > st1_end.arrival_time
      AND st2.departure_time < '24:00:00'
      
-     MATCH (st2)-[:NEXT_STOP*1..30]->(st2_end:StopTime)-[:AT_STOP]->(endStop:Stop)
-     WHERE endStop.name = $endStopName
+     MATCH (trip2)-[:STOPS_AT]->(st2_end:StopTime)-[:AT_STOP]->(endStop:Stop {name: endName})
+     WHERE st2.stop_sequence < st2_end.stop_sequence
      
-     MATCH (trip2:Trip)-[:STOPS_AT]->(st2)
-     WHERE trip2 <> trip1
-     MATCH (trip2)-[:ON_ROUTE]->(route2:Route)
-     
-     WITH startStop, st1, st1_end, transferStop, st2, st2_end, endStop,
-          route1, route2,
-          st1.departure_time as dep1, st1_end.arrival_time as arr1,
-          st2.departure_time as dep2, st2_end.arrival_time as arr2
-     
-     // Filter: ensure minimum transfer time (compare as strings works for HH:MM:SS)
      WITH *, 
-          toInteger(substring(arr1, 0, 2)) * 60 + toInteger(substring(arr1, 3, 2)) as arr1_mins,
-          toInteger(substring(dep2, 0, 2)) * 60 + toInteger(substring(dep2, 3, 2)) as dep2_mins
+          toInteger(substring(st1_end.arrival_time, 0, 2)) * 60 + toInteger(substring(st1_end.arrival_time, 3, 2)) as arr1_mins,
+          toInteger(substring(st2.departure_time, 0, 2)) * 60 + toInteger(substring(st2.departure_time, 3, 2)) as dep2_mins
      WHERE dep2_mins >= arr1_mins + $minTransferTime
      
      RETURN {
@@ -235,8 +220,8 @@ async function findRoutesWithOneTransfer(
          board_stop_name: startStop.name,
          alight_stop_id: transferStop.id,
          alight_stop_name: transferStop.name,
-         departure_time: dep1,
-         arrival_time: arr1,
+         departure_time: st1.departure_time,
+         arrival_time: st1_end.arrival_time,
          route_short_name: route1.short_name,
          route_long_name: route1.long_name,
          route_type: route1.type
@@ -246,8 +231,8 @@ async function findRoutesWithOneTransfer(
          board_stop_name: transferStop.name,
          alight_stop_id: endStop.id,
          alight_stop_name: endStop.name,
-         departure_time: dep2,
-         arrival_time: arr2,
+         departure_time: st2.departure_time,
+         arrival_time: st2_end.arrival_time,
          route_short_name: route2.short_name,
          route_long_name: route2.long_name,
          route_type: route2.type

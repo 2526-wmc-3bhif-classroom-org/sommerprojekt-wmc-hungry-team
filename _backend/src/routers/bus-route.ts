@@ -1,6 +1,7 @@
 import {Router, Request, Response} from 'express';
 import {findRoutes, testNeo4jConnection} from '../repo/bus-repo-neo4j.js';
 import {parseCoordinatePair, validateTimeFormat, validateMaxTransfers} from '../utils/validation.js';
+import { globalCSARouter } from '../repo/csa-router.js';
 
 const router = Router();
 
@@ -50,20 +51,25 @@ router.get('/api/bus/route', async (req: Request, res: Response) => {
             return res.status(400).json({ error: transfersResult.error });
         }
 
-        const routes = await findRoutes(
-            coords.latA, coords.lonA,
-            coords.latB, coords.lonB,
-            timeResult.time,
-            transfersResult.maxTransfers
-        );
-
-        res.set('X-Route-Backend', 'neo4j');
-        
-        if (routes.length > 0) {
-            res.json(routes);
+        let routes = [];
+        if (globalCSARouter.ready) {
+            routes = globalCSARouter.findRoute(
+                coords.latA, coords.lonA,
+                coords.latB, coords.lonB,
+                timeResult.time
+            );
+            res.set('X-Route-Backend', 'csa-in-memory');
         } else {
-            res.sendStatus(404);
+            routes = await findRoutes(
+                coords.latA, coords.lonA,
+                coords.latB, coords.lonB,
+                timeResult.time,
+                transfersResult.maxTransfers
+            );
+            res.set('X-Route-Backend', 'neo4j');
         }
+        
+        res.json(routes);
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Internal server error' });

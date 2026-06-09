@@ -7,6 +7,10 @@ interface GeocodeResponse {
   }
 }
 
+export interface AutocompleteResult {
+  description: string
+  place_id: string
+}
 interface ServiceStatusResponse {
   status: 'ok' | 'error'
   backend: string
@@ -17,6 +21,14 @@ interface ServiceStatusResponse {
 type QueryValue = string | number
 
 function toApiError(error: unknown): Error {
+  // $fetch throws FetchError with .data containing the parsed JSON response body
+  if (error && typeof error === 'object' && 'data' in error) {
+    const data = (error as Record<string, unknown>).data
+    if (data && typeof data === 'object' && 'error' in data && typeof (data as Record<string, unknown>).error === 'string') {
+      return new Error((data as Record<string, unknown>).error as string)
+    }
+  }
+
   if (error instanceof Error) {
     return error
   }
@@ -59,6 +71,10 @@ export function useSmarthubApi() {
     return get<GeocodeResponse>('/api/places/geocode', { place })
   }
 
+  const autocompletePlace = async (query: string): Promise<AutocompleteResult[]> => {
+    return get<AutocompleteResult[]>('/api/places/autocomplete', { q: query })
+  }
+
   const fetchServiceStatus = async (): Promise<ServiceStatusResponse> => {
     try {
       return await $fetch<ServiceStatusResponse>(buildUrl('/api/bus/test'), { credentials: 'include' })
@@ -90,6 +106,7 @@ export function useSmarthubApi() {
     get,
     post,
     geocodePlace,
+    autocompletePlace,
     fetchServiceStatus,
     login,
     register,

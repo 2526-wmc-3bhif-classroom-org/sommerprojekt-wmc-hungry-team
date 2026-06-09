@@ -1,7 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useSettings } from '../composables/use-settings'
+import CarWidget from '../components/car-widget.vue'
 
-const { preview, clearPreview } = useSettings()
+const { preview, clearPreview, getDay } = useSettings()
+
+const today = new Date().toISOString().slice(0, 10)
+const activeRoutine = computed(() => {
+  const daySettings = getDay(today)
+  return daySettings.routines[0] // take the first routine for now, or you could do time-based logic
+})
+
+const transportMode = computed(() => activeRoutine.value?.transportMode)
 </script>
 
 <template>
@@ -30,7 +40,11 @@ const { preview, clearPreview } = useSettings()
         <div v-else>No routes found</div>
       </div>
 
-      <bus-widget />
+      <bus-widget v-if="transportMode === 'bus'" />
+      <car-widget v-else-if="transportMode === 'car'" />
+      <div v-else class="no-routine-msg">
+        Bitte Routine in den Einstellungen konfigurieren
+      </div>
     </div>
   </div>
 </template>
@@ -72,4 +86,14 @@ const { preview, clearPreview } = useSettings()
 .route-preview { background:#fff; padding:12px; border-radius:8px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06) }
 .route-preview__header { display:flex; justify-content:space-between; align-items:center }
 .route-card { padding:8px; border:1px solid #eee; border-radius:6px; margin-bottom:8px }
+
+.no-routine-msg {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 32px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 1.1rem;
+}
 </style>

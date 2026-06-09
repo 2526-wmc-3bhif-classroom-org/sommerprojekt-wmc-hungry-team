@@ -11,6 +11,8 @@ import { closeNeo4j } from './repo/neo4j-driver.js';
 import { closeDb, getDb } from './db/sqlite.js';
 import authRouter from './routers/auth.js';
 import routinesRouter from './routers/routines.js';
+import { globalCSARouter } from './repo/csa-router.js';
+import { getNeo4jDriver } from './repo/neo4j-driver.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +32,9 @@ app.use(express.json());
 app.use(cookieParser());
 
 getDb();
+
+// Load the graph for CSA routing in the background
+globalCSARouter.loadGraph(getNeo4jDriver()).catch(console.error);
 
 app.use(busRouter);
 app.use(weatherRouter);

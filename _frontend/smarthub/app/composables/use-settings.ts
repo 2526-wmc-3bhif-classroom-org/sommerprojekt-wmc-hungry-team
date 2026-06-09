@@ -2,32 +2,25 @@ import { ref, readonly } from 'vue'
 
 export type RoutineItem = {
   id: string
-  time: string // HH:MM or HH:MM:SS
-  title: string
-  location?: string
-}
-
-export type AlarmItem = {
-  id: string
-  time: string // HH:MM or HH:MM:SS
-  repeat: boolean
-  enabled: boolean
+  startTime: string
+  alarmTime: string
+  destination: string
+  startAddress: string
+  transportMode: 'bus' | 'car'
 }
 
 export type DaySettings = {
-  alarms: AlarmItem[]
-  routine: RoutineItem[]
+  routines: RoutineItem[]
 }
 
 export type Settings = {
-  homeLocation?: string
   days: Record<string, DaySettings>
 }
 
-const STORAGE_KEY = 'smarthub-settings:v1'
+const STORAGE_KEY = 'smarthub-settings:v2'
 
 function emptyDay(): DaySettings {
-  return { alarms: [], routine: [] }
+  return { routines: [] }
 }
 
 function loadFromStorage(): Settings {
@@ -70,50 +63,36 @@ export function useSettings() {
     return state.value.days[dayKey]
   }
 
-  function setHomeLocation(loc: string) {
-    state.value.homeLocation = loc
-    save(state.value)
-  }
-
-  function addAlarm(dayKey: string, time = '08:00') {
+  function addRoutineItem(dayKey: string) {
     ensureDay(dayKey)
-    const alarm: AlarmItem = { id: crypto.randomUUID(), time, repeat: true, enabled: true }
-    state.value.days[dayKey].alarms.push(alarm)
-    save(state.value)
-    return alarm
-  }
-
-  function updateAlarm(dayKey: string, updated: AlarmItem) {
-    ensureDay(dayKey)
-    const idx = state.value.days[dayKey].alarms.findIndex(a => a.id === updated.id)
-    if (idx !== -1) state.value.days[dayKey].alarms.splice(idx, 1, updated)
-    save(state.value)
-  }
-
-  function removeAlarm(dayKey: string, id: string) {
-    ensureDay(dayKey)
-    state.value.days[dayKey].alarms = state.value.days[dayKey].alarms.filter(a => a.id !== id)
-    save(state.value)
-  }
-
-  function addRoutineItem(dayKey: string, title = 'Title', time = '10:00', location?: string) {
-    ensureDay(dayKey)
-    const item: RoutineItem = { id: crypto.randomUUID(), title, time, location }
-    state.value.days[dayKey].routine.push(item)
+    const now = new Date()
+    const hh = String(now.getHours()).padStart(2, '0')
+    const mm = String(now.getMinutes()).padStart(2, '0')
+    const currentTime = `${hh}:${mm}`
+    
+    const item: RoutineItem = {
+      id: crypto.randomUUID(),
+      startTime: currentTime,
+      alarmTime: currentTime,
+      destination: '',
+      startAddress: '',
+      transportMode: 'bus'
+    }
+    state.value.days[dayKey].routines.push(item)
     save(state.value)
     return item
   }
 
   function updateRoutineItem(dayKey: string, updated: RoutineItem) {
     ensureDay(dayKey)
-    const idx = state.value.days[dayKey].routine.findIndex(r => r.id === updated.id)
-    if (idx !== -1) state.value.days[dayKey].routine.splice(idx, 1, updated)
+    const idx = state.value.days[dayKey].routines.findIndex(r => r.id === updated.id)
+    if (idx !== -1) state.value.days[dayKey].routines.splice(idx, 1, updated)
     save(state.value)
   }
 
   function removeRoutineItem(dayKey: string, id: string) {
     ensureDay(dayKey)
-    state.value.days[dayKey].routine = state.value.days[dayKey].routine.filter(r => r.id !== id)
+    state.value.days[dayKey].routines = state.value.days[dayKey].routines.filter(r => r.id !== id)
     save(state.value)
   }
 
@@ -134,10 +113,6 @@ export function useSettings() {
     state: readonly(state),
     preview,
     getDay,
-    setHomeLocation,
-    addAlarm,
-    updateAlarm,
-    removeAlarm,
     addRoutineItem,
     updateRoutineItem,
     removeRoutineItem,
