@@ -1,4 +1,3 @@
-<script src="../../../../_backend/src/repo/places-repo.ts"></script>
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
