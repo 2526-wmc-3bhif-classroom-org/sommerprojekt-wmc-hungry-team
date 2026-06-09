@@ -4,15 +4,15 @@
       <NuxtPage />
     </NuxtLayout>
 
-    <SettingsButton />
-    <HomeButton />
+    <SettingsButton v-if="$route.path !== '/login'" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import SettingsButton from './components/settings-button.vue'
-import HomeButton from './components/home-button.vue'
+
+const route = useRoute()
 </script>
 
 <style scoped>
