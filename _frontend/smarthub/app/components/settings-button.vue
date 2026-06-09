@@ -23,6 +23,8 @@
   box-shadow: 0 6px 18px rgba(17,24,39,0.35);
   text-decoration: none;
   font-size: 20px;
+  z-index: 50;
+  transition: transform 0.2s ease;
 }
 .settings-button:hover { transform: translateY(-2px); }
 </style>

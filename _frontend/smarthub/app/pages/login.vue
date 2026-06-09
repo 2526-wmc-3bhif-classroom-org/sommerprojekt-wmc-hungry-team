@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useSmarthubApi } from '../composables/use-smarthub-api.js'
+
+const router = useRouter()
+
 const mode = ref<'login' | 'register'>('login')
 const name = ref('')
 const email = ref('')
@@ -15,7 +21,7 @@ const { login, register, fetchMe } = useSmarthubApi()
 onMounted(async () => {
   try {
     await fetchMe()
-    await navigateTo('/dashboard')
+    await router.push('/dashboard')
   } catch {
     // stay on login
   }
@@ -30,7 +36,7 @@ const submit = async () => {
     } else {
       await register(name.value, email.value, password.value)
     }
-    await navigateTo('/dashboard')
+    await router.push('/dashboard')
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Login fehlgeschlagen'
   } finally {

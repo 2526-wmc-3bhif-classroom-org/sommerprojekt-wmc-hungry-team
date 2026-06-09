@@ -1,11 +1,18 @@
+<script src="../../../../_backend/src/repo/places-repo.ts"></script>
 <script setup lang="ts">
-import { useSettings } from '../composables/use-settings'
-import { useSmarthubApi } from '../composables/use-smarthub-api'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useRuntimeConfig } from '#app'
+import { useSettings } from '../composables/use-settings.js'
+import { useSmarthubApi } from '../composables/use-smarthub-api.js'
 import DatePickerPopup from '../components/date-picker-popup.vue'
 
 definePageMeta({
   alias: ['/routine-settings'],
 })
+
+const router = useRouter()
+const route = useRoute()
 
 const today = new Date().toISOString().slice(0, 10)
 const selectedDate = ref<string>(today)
@@ -26,7 +33,6 @@ const loadingStatus = ref(true)
 
 const config = useRuntimeConfig()
 const apiBase = String(config.public.apiBaseUrl || '').replace(/\/$/, '')
-const route = useRoute()
 
 function addNewAlarm() { addAlarm(dayKey.value) }
 function addNewRoutine() { addRoutineItem(dayKey.value) }
@@ -51,7 +57,7 @@ const connectGoogle = () => {
 
 const handleLogout = async () => {
   await logout()
-  await navigateTo('/login')
+  await router.push('/login')
 }
 
 async function calculateRouteFor(item) {
@@ -75,7 +81,7 @@ async function calculateRouteFor(item) {
 
     // Store preview in shared settings and navigate to dashboard
     setPreview({ routes, item, home: home.coordinates, place: place.coordinates })
-    navigateTo('/dashboard')
+    router.push('/dashboard')
   } catch (e) {
     alert(e instanceof Error ? e.message : String(e))
   }
@@ -92,7 +98,7 @@ onMounted(async () => {
 <template>
   <div class="settings-page">
     <div class="settings-left">
-      <button class="back-btn" @click="navigateTo('/dashboard')">Back to Dashboard</button>
+      <button class="back-btn" @click="router.push('/dashboard')">Back to Dashboard</button>
       <h2>Settings</h2>
       <label>Home location</label>
       <input class="home-input" v-model="homeLocation" placeholder="e.g. Home address or 'Linz'" />

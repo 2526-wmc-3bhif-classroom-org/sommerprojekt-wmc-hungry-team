@@ -1,4 +1,7 @@
 export default defineNuxtRouteMiddleware(async (to) => {
+  // Skip auth check during SSR - let client handle it
+  if (process.server) return
+  
   if (to.path === '/login') return
 
   const config = useRuntimeConfig()
@@ -7,7 +10,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
   try {
     await $fetch(`${apiBase}/api/auth/me`, {
       credentials: 'include',
-      headers: process.server ? useRequestHeaders(['cookie']) : undefined,
     })
   } catch {
     return navigateTo('/login')
