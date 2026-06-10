@@ -11,7 +11,24 @@ const currentDayOfWeek = ref(new Date().getDay())
 const today = new Date().toISOString().slice(0, 10)
 
 const busRoutine = computed(() => {
-  return state.value.routines.find(r => r.activeDays?.includes(currentDayOfWeek.value) && r.transportMode === 'bus')
+  const now = new Date()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const currentTime = `${hh}:${mm}`
+
+  return state.value.routines.find(r => {
+    if (!r.activeDays?.includes(currentDayOfWeek.value)) return false
+    if (r.transportMode !== 'bus') return false
+    
+    const start = r.startTime || '00:00'
+    const end = r.endTime || '23:59'
+    
+    if (start <= end) {
+      return currentTime >= start && currentTime <= end
+    } else {
+      return currentTime >= start || currentTime <= end
+    }
+  })
 })
 
 const startPlace = computed(() => busRoutine.value?.startAddress ?? '')
@@ -49,7 +66,20 @@ onMounted(async () => {
       geocodePlace(endPlace.value),
     ])
 
-    const fetchRoutesAt = (departureTime: string) => {
+    const targetArrival = busRoutine.value?.arrivalTime ? `${busRoutine.value.arrivalTime}:00` : '08:00:00'
+
+    const fetchRoutesByArrival = (arrivalTime: string) => {
+      return get<BusRouteApiResponse[]>('/api/bus/route', {
+        lat_a: start.coordinates.lat,
+        lon_a: start.coordinates.lon,
+        lat_b: end.coordinates.lat,
+        lon_b: end.coordinates.lon,
+        arrival_time: arrivalTime,
+        max_transfers: MAX_TRANSFERS,
+      })
+    }
+
+    const fetchRoutesByDeparture = (departureTime: string) => {
       return get<BusRouteApiResponse[]>('/api/bus/route', {
         lat_a: start.coordinates.lat,
         lon_a: start.coordinates.lon,
@@ -60,14 +90,21 @@ onMounted(async () => {
       })
     }
 
-    let routes = await fetchRoutesAt(getCurrentTimeParam())
+    let routes = await fetchRoutesByArrival(targetArrival)
+    let selectedRoute = routes[0]
 
-    // Fallback for times where no immediate trip is available
-    if (routes.length === 0) {
-      routes = await fetchRoutesAt('10:50:00')
+    const nowTime = getCurrentTimeParam()
+    if (selectedRoute && selectedRoute.departure_time < nowTime) {
+      // Missed the ideal departure time! Fetch next available route departing now.
+      routes = await fetchRoutesByDeparture(nowTime)
+      selectedRoute = routes[0]
+    } else if (!selectedRoute) {
+      // Fallback if no route found arriving by that time
+      routes = await fetchRoutesByDeparture(nowTime)
+      selectedRoute = routes[0]
     }
 
-    route.value = routes[0] ?? null
+    route.value = selectedRoute ?? null
     if (!route.value) {
       error.value = 'No route found'
     }
@@ -81,7 +118,7 @@ onMounted(async () => {
 
 <template>
   <div class="bus-widget">
-    <h3 class="bus-widget__title">Route</h3>
+    <h3 class="bus-widget__title"><i class="fa-solid fa-route" style="color: #3b82f6; margin-right: 8px;"></i>Route</h3>
     <div v-if="loading" class="bus-widget__status">Loading route...</div>
     <div v-else-if="error" class="bus-widget__status bus-widget__status--error">{{ error }}</div>
     <template v-else>
@@ -103,10 +140,10 @@ onMounted(async () => {
             <div class="bus-widget__connection-content">
               <div class="bus-widget__connection-time">{{ formatTime(leg.departure_time) }}</div>
               <div class="bus-widget__connection-mode">
-                <span v-if="leg.route_type === 3">🚌</span>
-                <span v-else-if="leg.route_type === 0">🚋</span>
-                <span v-else-if="leg.route_type === 99">🚶</span>
-                <span v-else>🚌</span>
+                <i v-if="leg.route_type === 3" class="fa-solid fa-bus" style="color: #3b82f6; width: 24px; text-align: center;"></i>
+                <i v-else-if="leg.route_type === 0" class="fa-solid fa-train-tram" style="color: #3b82f6; width: 24px; text-align: center;"></i>
+                <i v-else-if="leg.route_type === 99" class="fa-solid fa-person-walking" style="color: #3b82f6; width: 24px; text-align: center;"></i>
+                <i v-else class="fa-solid fa-bus" style="color: #3b82f6; width: 24px; text-align: center;"></i>
                 <template v-if="leg.route_type === 99">
                   Walk
                 </template>

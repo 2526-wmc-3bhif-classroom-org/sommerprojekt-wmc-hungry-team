@@ -82,9 +82,17 @@ const handleLogout = async () => {
   await router.push('/login')
 }
 
-async function calculateRouteFor(item: any) {
-  if (!item.destination) { alert('No destination set for this routine item'); return }
-  if (item.transportMode === 'bus' && !item.startAddress) { alert('No start address set for bus route'); return }
+const toastMessage = ref('')
+let toastTimeout: any = null
+function showToast(msg: string) {
+  toastMessage.value = msg
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastTimeout = setTimeout(() => { toastMessage.value = '' }, 6000)
+}
+
+async function autoConfigure(item: any) {
+  if (!item.destination) { alert('Please set a destination first.'); return; }
+  if (item.transportMode === 'bus' && !item.startAddress) { alert('Please set a start address first.'); return; }
 
   try {
     const place = await geocodePlace(item.destination)
@@ -93,22 +101,53 @@ async function calculateRouteFor(item: any) {
       home = await geocodePlace(item.startAddress)
     }
 
-    const departure = item.startTime.includes(':') && item.startTime.split(':').length >= 2 ? (item.startTime.length === 5 ? item.startTime + ':00' : item.startTime) : item.startTime + ':00'
+    const arrival = item.arrivalTime.includes(':') && item.arrivalTime.split(':').length >= 2 ? (item.arrivalTime.length === 5 ? item.arrivalTime + ':00' : item.arrivalTime) : item.arrivalTime + ':00'
 
+    let departureTimeStr = ''
+    
     if (item.transportMode === 'bus' && home) {
-      const routes = await get('/api/bus/route', {
+      const routes = await get<any[]>('/api/bus/route', {
         lat_a: home.coordinates.lat,
         lon_a: home.coordinates.lon,
         lat_b: place.coordinates.lat,
         lon_b: place.coordinates.lon,
-        departure_time: departure,
+        arrival_time: arrival,
         max_transfers: 2,
       })
-
-      // Store preview in shared settings and navigate to dashboard
-      setPreview({ routes, item, home: home.coordinates, place: place.coordinates })
+      if (!routes || routes.length === 0) throw new Error('No bus routes found for this arrival time.')
+      
+      const firstRoute = routes[0]
+      if (firstRoute && firstRoute.departure_time) {
+        departureTimeStr = firstRoute.departure_time.slice(0, 5)
+      } else {
+        throw new Error('Could not parse departure time.')
+      }
+    } else {
+      throw new Error('Auto-configure is currently optimized for Public Transport.')
     }
-    router.push('/dashboard')
+
+    if (departureTimeStr) {
+      const shiftTime = (timeStr: string, diffMins: number) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const total = h * 60 + m + diffMins;
+        const wrapped = ((total % 1440) + 1440) % 1440;
+        return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+      };
+
+      const newVisibilityStart = shiftTime(departureTimeStr, -60)
+      const newVisibilityEnd = shiftTime(item.arrivalTime, 30)
+      const alarmTime = shiftTime(departureTimeStr, -45)
+
+      item.startTime = newVisibilityStart
+      item.endTime = newVisibilityEnd
+      
+      if (!item.alarms) item.alarms = []
+      item.alarms = [{ id: crypto.randomUUID(), time: alarmTime, enabled: true }]
+      
+      updateRoutineItem(item)
+      showToast(`To arrive at ${item.arrivalTime}, you depart at ${departureTimeStr}. Alarm set to ${alarmTime}.`)
+    }
+
   } catch (e) {
     alert(e instanceof Error ? e.message : String(e))
   }
@@ -124,10 +163,16 @@ onMounted(async () => {
 
 <template>
   <div class="settings-page">
+    <transition name="toast-slide">
+      <div v-if="toastMessage" class="ios-toast">
+        <div class="ios-toast-icon"><i class="fa-solid fa-circle-check" style="color: #10b981;"></i></div>
+        <div class="ios-toast-text">{{ toastMessage }}</div>
+      </div>
+    </transition>
     <div class="settings-left">
       <div class="settings-page-header">
         <button class="back-btn-premium" @click="router.push('/dashboard')">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          <i class="fa-solid fa-arrow-left"></i>
           Back to Dashboard
         </button>
         <h2>Settings</h2>
@@ -135,7 +180,7 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3>🖥️ Dashboard View</h3>
+          <h3><i class="fa-solid fa-display" style="color: #3b82f6; margin-right: 8px;"></i>Dashboard View</h3>
         </div>
         <div class="routine-card">
           <div class="routine-card__body" style="padding: 16px 20px;">
@@ -154,7 +199,7 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3>⏰ Your Routines</h3>
+          <h3><i class="fa-solid fa-clock" style="color: #3b82f6; margin-right: 8px;"></i>Your Routines</h3>
           <button class="add-routine-btn-premium" @click="addNewRoutine">+ New Routine</button>
         </div>
 
@@ -166,13 +211,13 @@ onMounted(async () => {
                 class="segment-btn" 
                 :class="{ active: item.transportMode === 'bus' }"
                 @click="item.transportMode = 'bus'; updateRoutineItem(item)"
-              >🚌 Public Transport</button>
+              ><i class="fa-solid fa-bus" style="margin-right: 4px;"></i>Public Transport</button>
               <button 
                 type="button" 
                 class="segment-btn" 
                 :class="{ active: item.transportMode === 'car' }"
                 @click="item.transportMode = 'car'; updateRoutineItem(item)"
-              >🚗 Car</button>
+              ><i class="fa-solid fa-car" style="margin-right: 4px;"></i>Car</button>
             </div>
             <button class="delete-routine-btn" @click.prevent="removeRoutineItem(item.id)" aria-label="Delete routine">Delete</button>
           </div>
@@ -194,17 +239,44 @@ onMounted(async () => {
             </div>
 
             <div class="routine-card__section">
-              <label class="field-label">Visibility on the Dashboard</label>
-              <p class="helper-text">Determines during which time period this routine is displayed (not an arrival time).</p>
+              <label class="field-label">Target Arrival Time</label>
+              <p class="helper-text">The router will find a connection that gets you to the destination by this time.</p>
+              <div class="routine-card__row" style="align-items: center; gap: 12px; margin-top: 4px; display: flex; width: 100%;">
+                <TimePicker 
+                  :model-value="item.arrivalTime"
+                  @update:model-value="(val) => { 
+                    item.arrivalTime = val;
+                    if (item.startTime > val) item.startTime = val;
+                    if (item.endTime < val) item.endTime = val;
+                    updateRoutineItem(item);
+                  }"
+                />
+                <button class="auto-configure-btn" @click="autoConfigure(item)" :disabled="item.transportMode !== 'bus'">
+                  <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 6px;"></i>Auto-Configure
+                </button>
+              </div>
+            </div>
+
+            <div class="routine-card__section" style="margin-top: 8px;">
+              <label class="field-label">Dashboard Visibility Window</label>
+              <p class="helper-text">When should this routine be displayed on your dashboard?</p>
               <div class="routine-card__row" style="align-items: center; gap: 12px; margin-top: 4px;">
                 <TimePicker 
                   :model-value="item.startTime"
-                  @update:model-value="(val) => { item.startTime = val; updateRoutineItem(item) }"
+                  :max-time="item.arrivalTime"
+                  @update:model-value="(val) => { 
+                    item.startTime = val;
+                    updateRoutineItem(item);
+                  }"
                 />
                 <span style="color: #6b7280; font-weight: 500;">to</span>
                 <TimePicker 
                   :model-value="item.endTime"
-                  @update:model-value="(val) => { item.endTime = val; updateRoutineItem(item) }"
+                  :min-time="item.arrivalTime"
+                  @update:model-value="(val) => { 
+                    item.endTime = val;
+                    updateRoutineItem(item);
+                  }"
                 />
               </div>
             </div>
@@ -247,7 +319,7 @@ onMounted(async () => {
                     />
                     <span class="slider"></span>
                   </label>
-                  <button class="remove-alarm-btn" @click="removeAlarm(item, alarm.id); updateRoutineItem(item)">✕</button>
+                  <button class="remove-alarm-btn" @click="removeAlarm(item, alarm.id); updateRoutineItem(item)"><i class="fa-solid fa-xmark"></i></button>
                 </div>
               </div>
               <div v-else class="alarms-empty">No alarms set</div>
@@ -260,7 +332,7 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3>📅 Integrations & Account</h3>
+          <h3><i class="fa-solid fa-calendar-day" style="color: #3b82f6; margin-right: 8px;"></i>Integrations & Account</h3>
         </div>
         
         <div class="routine-card">
@@ -302,6 +374,76 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.toast-slide-enter-active, .toast-slide-leave-active {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.toast-slide-enter-from, .toast-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -20px) scale(0.95);
+}
+.toast-slide-enter-to, .toast-slide-leave-from {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.ios-toast {
+  position: fixed;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 12px 20px;
+  border-radius: 30px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 9999;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.ios-toast-icon {
+  font-size: 1.2rem;
+}
+
+.ios-toast-text {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #1c1c1e;
+  letter-spacing: -0.01em;
+}
+
+.auto-configure-btn {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  transition: transform 0.2s, box-shadow 0.2s;
+  white-space: nowrap;
+}
+.auto-configure-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+}
+.auto-configure-btn:active:not(:disabled) {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.2);
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.auto-configure-btn:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .settings-page {
   display: flex;
   justify-content: center;

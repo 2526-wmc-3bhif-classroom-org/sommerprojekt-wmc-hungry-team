@@ -11,6 +11,7 @@ export type RoutineItem = {
   name: string
   startTime: string
   endTime: string
+  arrivalTime: string
   destination: string
   startAddress: string
   transportMode: 'bus' | 'car'
@@ -43,6 +44,7 @@ function apiToRoutineItem(r: any): RoutineItem {
     name: r.name || 'Routine',
     startTime: r.startTime || '08:00',
     endTime: r.endTime || '09:00',
+    arrivalTime: r.arrivalTime || '08:00',
     destination: r.destination || '',
     startAddress: r.startAddress || '',
     transportMode: r.transportMode || 'bus',
@@ -57,6 +59,7 @@ function routineItemToApi(item: RoutineItem): Record<string, unknown> {
     name: item.name || 'Routine',
     start_time: item.startTime,
     end_time: item.endTime,
+    arrival_time: item.arrivalTime,
     days: item.activeDays || [],
     transport_mode: item.transportMode || 'bus',
     destination: item.destination || '',
@@ -121,8 +124,9 @@ export function useSettings() {
     const newItem: RoutineItem = {
       id: crypto.randomUUID(), // temporary
       name: 'Routine',
-      startTime: currentTime,
-      endTime: currentTime,
+      startTime: '06:00',
+      endTime: '08:30',
+      arrivalTime: '08:00',
       destination: '',
       startAddress: '',
       transportMode: 'bus',

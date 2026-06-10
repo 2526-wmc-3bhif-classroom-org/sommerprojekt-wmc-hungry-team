@@ -16,7 +16,7 @@ const hasDestination = computed(() => destination.value.trim() !== '')
 
 <template>
   <div class="car-widget">
-    <h3 class="car-widget__title">Route (Car)</h3>
+    <h3 class="car-widget__title"><i class="fa-solid fa-car" style="color: #3b82f6; margin-right: 8px;"></i>Route (Car)</h3>
     <div v-if="!hasDestination" class="car-widget__status">
       Please configure destination address in the settings
     </div>

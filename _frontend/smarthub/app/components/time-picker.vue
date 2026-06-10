@@ -1,43 +1,68 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps<{
   modelValue: string
+  minTime?: string
+  maxTime?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: string): void
 }>()
 
-const hours = computed({
-  get: () => (props.modelValue || '00:00').split(':')[0] || '00',
-  set: (val: string) => emit('update:modelValue', `${val}:${minutes.value}`)
+const localHours = ref(props.modelValue.split(':')[0] || '00')
+const localMinutes = ref((props.modelValue.split(':')[1] || '00').substring(0, 2))
+
+watch(() => props.modelValue, (newVal) => {
+  localHours.value = newVal.split(':')[0] || '00'
+  localMinutes.value = (newVal.split(':')[1] || '00').substring(0, 2)
 })
 
-const minutes = computed({
-  get: () => ((props.modelValue || '00:00').split(':')[1] || '00').substring(0, 2),
-  set: (val: string) => emit('update:modelValue', `${hours.value}:${val}`)
+const localTime = computed(() => {
+  const h = String(parseInt(localHours.value) || 0).padStart(2, '0')
+  const m = String(parseInt(localMinutes.value) || 0).padStart(2, '0')
+  return `${h}:${m}`
 })
+
+const isInvalid = computed(() => {
+  if (props.minTime && localTime.value < props.minTime) return true
+  if (props.maxTime && localTime.value > props.maxTime) return true
+  return false
+})
+
+const handleBlur = () => {
+  if (isInvalid.value) {
+    localHours.value = props.modelValue.split(':')[0] || '00'
+    localMinutes.value = (props.modelValue.split(':')[1] || '00').substring(0, 2)
+  } else {
+    localHours.value = String(Math.min(23, Math.max(0, parseInt(localHours.value) || 0))).padStart(2, '0')
+    localMinutes.value = String(Math.min(59, Math.max(0, parseInt(localMinutes.value) || 0))).padStart(2, '0')
+    if (localTime.value !== props.modelValue) {
+      emit('update:modelValue', localTime.value)
+    }
+  }
+}
 </script>
 
 <template>
-  <div class="time-picker">
+  <div class="time-picker" :class="{ 'is-invalid': isInvalid }">
     <input 
       type="number" 
-      v-model="hours" 
+      v-model="localHours" 
       class="time-input" 
       min="0" 
       max="23" 
-      @blur="hours = String(Math.min(23, Math.max(0, parseInt(hours) || 0))).padStart(2, '0')"
+      @blur="handleBlur"
     />
     <span class="time-separator">:</span>
     <input 
       type="number" 
-      v-model="minutes" 
+      v-model="localMinutes" 
       class="time-input" 
       min="0" 
       max="59" 
-      @blur="minutes = String(Math.min(59, Math.max(0, parseInt(minutes) || 0))).padStart(2, '0')"
+      @blur="handleBlur"
     />
   </div>
 </template>
@@ -52,6 +77,12 @@ const minutes = computed({
   border-radius: 8px;
   padding: 4px 8px;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.time-picker.is-invalid {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px #ef4444;
 }
 
 .time-input {

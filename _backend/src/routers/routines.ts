@@ -45,6 +45,7 @@ router.post('/api/routines', requireAuth, (req: AuthenticatedRequest, res: Respo
   const transportMode = req.body?.transport_mode ?? req.body?.transportMode;
   const destination = req.body?.destination;
   const startAddress = req.body?.start_address ?? req.body?.startAddress;
+  const arrivalTime = req.body?.arrival_time ?? req.body?.arrivalTime;
 
   const routine = createRoutine({
     userId: req.user.id,
@@ -54,6 +55,7 @@ router.post('/api/routines', requireAuth, (req: AuthenticatedRequest, res: Respo
     transportMode,
     destination,
     startAddress,
+    arrivalTime,
     days: daysResult.value,
     config: req.body?.config ?? {}
   });
@@ -92,6 +94,7 @@ router.put('/api/routines/:id', requireAuth, (req: AuthenticatedRequest, res: Re
   const transportMode = req.body?.transport_mode ?? req.body?.transportMode;
   const destination = req.body?.destination;
   const startAddress = req.body?.start_address ?? req.body?.startAddress;
+  const arrivalTime = req.body?.arrival_time ?? req.body?.arrivalTime;
 
   const routine = updateRoutine({
     routineId: req.params.id,
@@ -102,6 +105,7 @@ router.put('/api/routines/:id', requireAuth, (req: AuthenticatedRequest, res: Re
     transportMode,
     destination,
     startAddress,
+    arrivalTime,
     days: daysResult.value,
     config: req.body?.config ?? {}
   });

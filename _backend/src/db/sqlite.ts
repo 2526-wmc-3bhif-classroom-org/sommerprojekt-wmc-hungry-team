@@ -92,6 +92,7 @@ function migrate(database: Database.Database) {
   try { database.exec("ALTER TABLE routines ADD COLUMN transport_mode TEXT NOT NULL DEFAULT 'bus'"); } catch (e) {}
   try { database.exec("ALTER TABLE routines ADD COLUMN destination TEXT NOT NULL DEFAULT ''"); } catch (e) {}
   try { database.exec("ALTER TABLE routines ADD COLUMN start_address TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { database.exec("ALTER TABLE routines ADD COLUMN arrival_time TEXT NOT NULL DEFAULT '08:00'"); } catch (e) {}
 }
 
 export function getDb(): Database.Database {

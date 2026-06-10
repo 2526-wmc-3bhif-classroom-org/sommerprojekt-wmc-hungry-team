@@ -22,7 +22,7 @@ const activeAlarms = computed(() => {
 
 <template>
   <div class="appointments-widget">
-    <h3 class="appointments-widget__title">⏰ Upcoming Alarms (Today)</h3>
+    <h3 class="appointments-widget__title"><i class="fa-solid fa-clock" style="color: #3b82f6; margin-right: 8px;"></i>Upcoming Alarms (Today)</h3>
     <div v-if="activeAlarms.length === 0" class="appointments-widget__status">
       No alarms activated for today.
     </div>

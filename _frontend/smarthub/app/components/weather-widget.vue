@@ -24,11 +24,11 @@ const { geocodePlace, get } = useSmarthubApi()
 
 const weatherIcon = computed(() => {
   const current = weather.value
-  if (!current) return '❔'
-  if (current.conditions.snow) return '❄️'
-  if (current.conditions.rain) return '🌧️'
-  if (current.conditions.cloudy) return '☁️'
-  return '☀️'
+  if (!current) return '<i class="fa-solid fa-circle-question" style="color: #9ca3af;"></i>'
+  if (current.conditions.snow) return '<i class="fa-solid fa-snowflake" style="color: #60a5fa;"></i>'
+  if (current.conditions.rain) return '<i class="fa-solid fa-cloud-rain" style="color: #94a3b8;"></i>'
+  if (current.conditions.cloudy) return '<i class="fa-solid fa-cloud" style="color: #9ca3af;"></i>'
+  return '<i class="fa-solid fa-sun" style="color: #f59e0b;"></i>'
 })
 
 onMounted(async () => {
@@ -56,7 +56,7 @@ onMounted(async () => {
     <div v-if="loading" class="weather-widget__status">Loading weather...</div>
     <div v-else-if="error" class="weather-widget__status weather-widget__status--error">{{ error }}</div>
     <div v-else-if="weather" class="weather-widget__content">
-      <div class="weather-widget__icon">{{ weatherIcon }}</div>
+      <div class="weather-widget__icon" v-html="weatherIcon"></div>
       <div class="weather-widget__info">
         <div class="weather-widget__temp">{{ Math.round(weather.temperature) }}°C</div>
         <div class="weather-widget__sky">{{ weather.weatherDescription }}</div>

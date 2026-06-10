@@ -82,13 +82,13 @@ export function parseCoordinatePair(
 /**
  * Validate time string in HH:MM:SS format
  */
-export function validateTimeFormat(time: string | undefined): { valid: true; time: string } | ValidationError {
+export function validateTimeFormat(time: string | undefined, paramName: string = 'departure_time'): { valid: true; time: string } | ValidationError {
   if (!time) {
-    return { valid: false, error: 'Missing required parameter: departure_time' };
+    return { valid: false, error: `Missing required parameter: ${paramName}` };
   }
 
   if (!/^\d{2}:\d{2}:\d{2}$/.test(time)) {
-    return { valid: false, error: 'departure_time must be in HH:MM:SS format' };
+    return { valid: false, error: `${paramName} must be in HH:MM:SS format` };
   }
 
   return { valid: true, time };
