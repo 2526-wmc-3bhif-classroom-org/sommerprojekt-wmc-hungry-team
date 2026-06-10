@@ -42,11 +42,18 @@ router.post('/api/routines', requireAuth, (req: AuthenticatedRequest, res: Respo
     return res.status(400).json({ error: daysResult.error });
   }
 
+  const transportMode = req.body?.transport_mode ?? req.body?.transportMode;
+  const destination = req.body?.destination;
+  const startAddress = req.body?.start_address ?? req.body?.startAddress;
+
   const routine = createRoutine({
     userId: req.user.id,
     name: nameResult.value,
     startTime: startResult.value,
     endTime: endResult.value,
+    transportMode,
+    destination,
+    startAddress,
     days: daysResult.value,
     config: req.body?.config ?? {}
   });
@@ -82,12 +89,19 @@ router.put('/api/routines/:id', requireAuth, (req: AuthenticatedRequest, res: Re
     return res.status(400).json({ error: daysResult.error });
   }
 
+  const transportMode = req.body?.transport_mode ?? req.body?.transportMode;
+  const destination = req.body?.destination;
+  const startAddress = req.body?.start_address ?? req.body?.startAddress;
+
   const routine = updateRoutine({
     routineId: req.params.id,
     userId: req.user.id,
     name: nameResult.value,
     startTime: startResult.value,
     endTime: endResult.value,
+    transportMode,
+    destination,
+    startAddress,
     days: daysResult.value,
     config: req.body?.config ?? {}
   });

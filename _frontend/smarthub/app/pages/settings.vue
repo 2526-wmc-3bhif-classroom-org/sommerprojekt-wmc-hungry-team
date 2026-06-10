@@ -14,7 +14,7 @@ definePageMeta({
 const router = useRouter()
 const route = useRoute()
 
-const { state, getGlobalSettings, addRoutineItem, updateRoutineItem, removeRoutineItem, setPreview } = useSettings()
+const { state, getGlobalSettings, addRoutineItem, updateRoutineItem, removeRoutineItem, setPreview, saveGlobalSettings } = useSettings()
 const { geocodePlace, get, fetchMe, logout } = useSmarthubApi()
 
 const globalSettings = computed(() => getGlobalSettings())
@@ -143,7 +143,7 @@ onMounted(async () => {
               <div class="routine-card__field">
                 <label class="field-label" style="font-size: 0.95rem; color: #111827; margin: 0; text-transform: none; letter-spacing: normal;">Clock Type</label>
               </div>
-              <select :value="globalSettings.clockType" @change="(e) => getGlobalSettings().clockType = (e.target as HTMLSelectElement).value" class="premium-select" style="min-width: 200px;">
+              <select :value="globalSettings.clockType" @change="(e) => { getGlobalSettings().clockType = (e.target as HTMLSelectElement).value as any; saveGlobalSettings() }" class="premium-select" style="min-width: 200px;">
                 <option value="digital">Digital (e.g. 14:30)</option>
                 <option value="analog">Analog (Clock face)</option>
               </select>

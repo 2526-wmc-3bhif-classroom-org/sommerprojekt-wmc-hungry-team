@@ -68,6 +68,14 @@ export function useSmarthubApi() {
     return request<T>('POST', path, { body })
   }
 
+  const put = async <T>(path: string, body: unknown) => {
+    return request<T>('PUT', path, { body })
+  }
+
+  const del = async <T>(path: string) => {
+    return request<T>('DELETE', path, {})
+  }
+
   const geocodePlace = async (place: string): Promise<GeocodeResponse> => {
     return get<GeocodeResponse>('/api/places/geocode', { place })
   }
@@ -110,9 +118,35 @@ export function useSmarthubApi() {
     )
   }
 
+  const fetchSettings = async () => {
+    return request<Record<string, unknown>>('GET', '/api/settings', {})
+  }
+
+  const updateSettings = async (settings: Record<string, unknown>) => {
+    return request<Record<string, unknown>>('PUT', '/api/settings', { body: settings })
+  }
+
+  const fetchRoutines = async () => {
+    return request<any[]>('GET', '/api/routines', {})
+  }
+
+  const createRoutine = async (routine: Record<string, unknown>) => {
+    return request<any>('POST', '/api/routines', { body: routine })
+  }
+
+  const updateRoutine = async (id: string, routine: Record<string, unknown>) => {
+    return request<any>('PUT', `/api/routines/${id}`, { body: routine })
+  }
+
+  const deleteRoutine = async (id: string) => {
+    return request<any>('DELETE', `/api/routines/${id}`, {})
+  }
+
   return {
     get,
     post,
+    put,
+    del,
     geocodePlace,
     autocompletePlace,
     fetchServiceStatus,
@@ -120,5 +154,11 @@ export function useSmarthubApi() {
     register,
     logout,
     fetchMe,
+    fetchSettings,
+    updateSettings,
+    fetchRoutines,
+    createRoutine,
+    updateRoutine,
+    deleteRoutine,
   }
 }

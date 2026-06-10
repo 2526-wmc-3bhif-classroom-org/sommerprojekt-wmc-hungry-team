@@ -13,8 +13,6 @@ function ensureDirectoryExists(filePath: string) {
 
 function migrate(database: Database.Database) {
   database.exec(`
-    PRAGMA foreign_keys = ON;
-
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
@@ -61,6 +59,9 @@ function migrate(database: Database.Database) {
       name TEXT NOT NULL,
       start_time TEXT NOT NULL,
       end_time TEXT NOT NULL,
+      transport_mode TEXT NOT NULL DEFAULT 'bus',
+      destination TEXT NOT NULL DEFAULT '',
+      start_address TEXT NOT NULL DEFAULT '',
       config_json TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -79,7 +80,18 @@ function migrate(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_google_accounts_user_id ON google_accounts(user_id);
     CREATE INDEX IF NOT EXISTS idx_oauth_states_user_id ON oauth_states(user_id);
     CREATE INDEX IF NOT EXISTS idx_routines_user_id ON routines(user_id);
+
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id TEXT PRIMARY KEY,
+      settings_json TEXT NOT NULL DEFAULT '{}',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
+
+  try { database.exec("ALTER TABLE routines ADD COLUMN transport_mode TEXT NOT NULL DEFAULT 'bus'"); } catch (e) {}
+  try { database.exec("ALTER TABLE routines ADD COLUMN destination TEXT NOT NULL DEFAULT ''"); } catch (e) {}
+  try { database.exec("ALTER TABLE routines ADD COLUMN start_address TEXT NOT NULL DEFAULT ''"); } catch (e) {}
 }
 
 export function getDb(): Database.Database {
@@ -88,6 +100,7 @@ export function getDb(): Database.Database {
     ensureDirectoryExists(dbPath);
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
     migrate(db);
   }
   return db;

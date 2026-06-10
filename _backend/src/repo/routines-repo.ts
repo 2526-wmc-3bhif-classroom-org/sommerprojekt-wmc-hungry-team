@@ -7,6 +7,9 @@ export interface RoutineRecord {
   name: string;
   start_time: string;
   end_time: string;
+  transport_mode: string;
+  destination: string;
+  start_address: string;
   config_json: string;
   created_at: string;
   updated_at: string;
@@ -17,6 +20,9 @@ export interface RoutineResponse {
   name: string;
   startTime: string;
   endTime: string;
+  transportMode: string;
+  destination: string;
+  startAddress: string;
   days: number[];
   config: unknown;
   createdAt: string;
@@ -42,6 +48,9 @@ export function listRoutines(userId: string): RoutineResponse[] {
         name: row.name,
         startTime: row.start_time,
         endTime: row.end_time,
+        transportMode: row.transport_mode,
+        destination: row.destination,
+        startAddress: row.start_address,
         days: [],
         config: JSON.parse(row.config_json),
         createdAt: row.created_at,
@@ -65,6 +74,9 @@ export function createRoutine(params: {
   name: string;
   startTime: string;
   endTime: string;
+  transportMode?: string;
+  destination?: string;
+  startAddress?: string;
   days: number[];
   config: unknown;
 }): RoutineResponse {
@@ -73,9 +85,13 @@ export function createRoutine(params: {
   const routineId = randomUUID();
   const configJson = JSON.stringify(params.config ?? {});
 
+  const transportMode = params.transportMode ?? 'bus';
+  const destination = params.destination ?? '';
+  const startAddress = params.startAddress ?? '';
+
   const insertRoutine = db.prepare(
-    `INSERT INTO routines (id, user_id, name, start_time, end_time, config_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO routines (id, user_id, name, start_time, end_time, transport_mode, destination, start_address, config_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertDay = db.prepare(
     `INSERT INTO routine_days (routine_id, day_of_week) VALUES (?, ?)`
@@ -88,6 +104,9 @@ export function createRoutine(params: {
       params.name,
       params.startTime,
       params.endTime,
+      transportMode,
+      destination,
+      startAddress,
       configJson,
       now,
       now
@@ -105,6 +124,9 @@ export function createRoutine(params: {
     name: params.name,
     startTime: params.startTime,
     endTime: params.endTime,
+    transportMode,
+    destination,
+    startAddress,
     days: params.days,
     config: params.config ?? {},
     createdAt: now,
@@ -118,6 +140,9 @@ export function updateRoutine(params: {
   name: string;
   startTime: string;
   endTime: string;
+  transportMode?: string;
+  destination?: string;
+  startAddress?: string;
   days: number[];
   config: unknown;
 }): RoutineResponse | null {
@@ -133,9 +158,13 @@ export function updateRoutine(params: {
     return null;
   }
 
+  const transportMode = params.transportMode ?? existing.transport_mode;
+  const destination = params.destination ?? existing.destination;
+  const startAddress = params.startAddress ?? existing.start_address;
+
   const updateRoutineStmt = db.prepare(
     `UPDATE routines
-     SET name = ?, start_time = ?, end_time = ?, config_json = ?, updated_at = ?
+     SET name = ?, start_time = ?, end_time = ?, transport_mode = ?, destination = ?, start_address = ?, config_json = ?, updated_at = ?
      WHERE id = ? AND user_id = ?`
   );
   const deleteDays = db.prepare('DELETE FROM routine_days WHERE routine_id = ?');
@@ -146,6 +175,9 @@ export function updateRoutine(params: {
       params.name,
       params.startTime,
       params.endTime,
+      transportMode,
+      destination,
+      startAddress,
       configJson,
       now,
       params.routineId,
@@ -164,6 +196,9 @@ export function updateRoutine(params: {
     name: params.name,
     startTime: params.startTime,
     endTime: params.endTime,
+    transportMode,
+    destination,
+    startAddress,
     days: params.days,
     config: params.config ?? {},
     createdAt: existing.created_at,

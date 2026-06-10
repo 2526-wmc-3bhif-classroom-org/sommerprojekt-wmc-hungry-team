@@ -105,8 +105,14 @@ onMounted(async () => {
               <div class="bus-widget__connection-mode">
                 <span v-if="leg.route_type === 3">🚌</span>
                 <span v-else-if="leg.route_type === 0">🚋</span>
+                <span v-else-if="leg.route_type === 99">🚶</span>
                 <span v-else>🚌</span>
-                Line {{ leg.route_short_name }}
+                <template v-if="leg.route_type === 99">
+                  Walk
+                </template>
+                <template v-else>
+                  Line {{ leg.route_short_name }}
+                </template>
               </div>
               <div class="bus-widget__connection-time">{{ formatTime(leg.arrival_time) }}</div>
             </div>

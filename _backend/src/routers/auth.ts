@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import {
   cleanupExpiredOAuthStates,
+  cleanupExpiredSessions,
   consumeOAuthState,
   createOAuthState,
   createSession,
@@ -75,11 +76,14 @@ router.post('/api/auth/register', async (req: Request, res: Response) => {
     });
 
     const sessionId = randomUUID();
+    const expiresAt = SESSION_MAX_AGE_DAYS > 0
+      ? new Date(Date.now() + SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      : null;
     createSession({
       id: sessionId,
       user_id: userId,
       created_at: now,
-      expires_at: null
+      expires_at: expiresAt
     });
     issueSessionCookie(res, sessionId);
 
@@ -113,15 +117,20 @@ router.post('/api/auth/login', async (req: Request, res: Response) => {
     }
 
     const sessionId = randomUUID();
+    const loginExpiresAt = SESSION_MAX_AGE_DAYS > 0
+      ? new Date(Date.now() + SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      : null;
     createSession({
       id: sessionId,
       user_id: user.id,
       created_at: new Date().toISOString(),
-      expires_at: null
+      expires_at: loginExpiresAt
     });
     issueSessionCookie(res, sessionId);
 
     res.json({ id: user.id, email: user.email, name: user.name });
+
+    try { cleanupExpiredSessions(); } catch (e) { console.error('Session cleanup error:', e); }
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Internal server error' });

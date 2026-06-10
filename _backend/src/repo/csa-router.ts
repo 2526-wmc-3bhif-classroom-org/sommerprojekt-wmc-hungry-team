@@ -114,49 +114,88 @@ export class CSARouter {
     }
   }
 
-  // Geocoding: Find nearest stop
-  findNearestStop(lat: number, lon: number): StopData | null {
-    let nearest: StopData | null = null;
-    let minDist = Infinity;
-    
-    // Simple Euclidean distance for rough estimation (valid for small regions)
-    for (const stop of this.stops.values()) {
-      const dLat = stop.lat - lat;
-      const dLon = stop.lon - lon;
-      const dist = dLat*dLat + dLon*dLon;
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = stop;
-      }
-    }
-    return nearest;
+  private getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3; // radius of the earth in m
+    const phi1 = lat1 * Math.PI/180;
+    const phi2 = lat2 * Math.PI/180;
+    const deltaPhi = (lat2-lat1) * Math.PI/180;
+    const deltaLambda = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return Math.round(R * c);
   }
 
-  // Standard CSA
+  // Find all stops within maxMeters, plus walking time in seconds
+  private findStopsWithinRadius(lat: number, lon: number, maxMeters: number): Array<{stop: StopData, walkTime: number}> {
+    const WALK_SPEED_M_S = 1.4; // approx 5km/h
+    const results = [];
+    for (const stop of this.stops.values()) {
+      const dist = this.getDistanceMeters(lat, lon, stop.lat, stop.lon);
+      if (dist <= maxMeters) {
+        results.push({ stop, walkTime: Math.round(dist / WALK_SPEED_M_S) });
+      }
+    }
+    
+    // Fallback: if none found within radius, find the absolute nearest stop
+    if (results.length === 0) {
+      let nearest: StopData | null = null;
+      let minDist = Infinity;
+      for (const stop of this.stops.values()) {
+        const dist = this.getDistanceMeters(lat, lon, stop.lat, stop.lon);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = stop;
+        }
+      }
+      if (nearest) {
+        results.push({ stop: nearest, walkTime: Math.round(minDist / WALK_SPEED_M_S) });
+      }
+    }
+    return results;
+  }
+
+  // Standard CSA with walking legs
   findRoute(startLat: number, startLon: number, endLat: number, endLon: number, startTimeStr: string): any {
     if (!this.ready) throw new Error("CSA Router not initialized");
 
-    const startStop = this.findNearestStop(startLat, startLon);
-    const endStop = this.findNearestStop(endLat, endLon);
+    const startTime = this.timeToSeconds(startTimeStr);
+    const MAX_WALK_METERS = 1500;
+    
+    // Direct walking check
+    const directWalkDist = this.getDistanceMeters(startLat, startLon, endLat, endLon);
+    const directWalkTime = Math.round(directWalkDist / 1.4);
 
-    if (!startStop || !endStop) {
+    const startStops = this.findStopsWithinRadius(startLat, startLon, MAX_WALK_METERS);
+    const endStops = this.findStopsWithinRadius(endLat, endLon, MAX_WALK_METERS);
+
+    if (startStops.length === 0 || endStops.length === 0) {
         console.log(`[CSA] Could not resolve stops`);
         return [];
     }
 
-    console.log(`[CSA] Routing from ${startStop.name} to ${endStop.name}`);
-
-    const startTime = this.timeToSeconds(startTimeStr);
-    
     // State arrays keyed by stop name (to allow transfers between platforms of the same stop)
     const earliestArrival = new Map<string, number>();
     const inConnection = new Map<string, Connection>();
     const tripReached = new Set<string>(); // Tracks trips we have boarded
+    const walkToStart = new Map<string, number>(); // Tracks walk time to start stop
 
     for (const stop of this.stops.values()) {
       earliestArrival.set(stop.name, Infinity);
     }
-    earliestArrival.set(startStop.name, startTime);
+    
+    // Initialize earliest arrival for all reachable start stops
+    for (const { stop, walkTime } of startStops) {
+      const arr = startTime + walkTime;
+      const existing = earliestArrival.get(stop.name)!;
+      if (arr < existing) {
+        earliestArrival.set(stop.name, arr);
+        walkToStart.set(stop.name, walkTime);
+      }
+    }
 
     let connsEvaluated = 0;
     // Run Connection Scan
@@ -182,23 +221,58 @@ export class CSARouter {
       }
     }
 
-    console.log(`[CSA] Evaluated ${connsEvaluated} connections. Dest arrival: ${earliestArrival.get(endStop.name)}`);
+    // Find the best end stop that minimizes (arrival at stop + walk to destination)
+    let bestTotalTime = Infinity;
+    let bestEndStopName: string | null = null;
+    let finalWalkTime = 0;
 
-    // Reconstruct path
-    if (earliestArrival.get(endStop.name) === Infinity) {
+    for (const { stop, walkTime } of endStops) {
+      const arr = earliestArrival.get(stop.name)!;
+      if (arr !== Infinity) {
+        const total = arr + walkTime;
+        if (total < bestTotalTime) {
+          bestTotalTime = total;
+          bestEndStopName = stop.name;
+          finalWalkTime = walkTime;
+        }
+      }
+    }
+
+    const transitTotalTime = bestTotalTime - startTime;
+    
+    // Check if direct walk is faster
+    if (directWalkTime < transitTotalTime && directWalkTime < bestTotalTime) {
+      const arrTime = startTime + directWalkTime;
+      return [{
+        legs: [{
+          board_stop_id: 'START', board_stop_name: 'Origin',
+          alight_stop_id: 'END', alight_stop_name: 'Destination',
+          departure_time: this.secondsToTime(startTime),
+          arrival_time: this.secondsToTime(arrTime),
+          route_short_name: 'Walk', route_long_name: 'Walking',
+          route_type: 99
+        }],
+        total_duration_minutes: Math.round(directWalkTime / 60),
+        departure_time: this.secondsToTime(startTime),
+        arrival_time: this.secondsToTime(arrTime),
+        num_transfers: 0
+      }];
+    }
+
+    if (bestTotalTime === Infinity || !bestEndStopName) {
       return []; // No route found
     }
 
+    console.log(`[CSA] Evaluated ${connsEvaluated} connections. Best arrival: ${this.secondsToTime(bestTotalTime)}`);
+
+    // Reconstruct path
     const legs = [];
-    let currentStopName = endStop.name;
+    let currentStopName = bestEndStopName;
     let currentConn = inConnection.get(currentStopName);
     
     while (currentConn) {
       legs.unshift(currentConn);
       const depStopName = this.stops.get(currentConn.departure_stop)!.name;
-      if (depStopName === startStop.name) {
-          break;
-      }
       currentConn = inConnection.get(depStopName);
       // Fallback to prevent infinite loops if data has cycles
       if (legs.length > 100) break;
@@ -206,6 +280,24 @@ export class CSARouter {
 
     // Convert raw legs into formatted output (grouping by trip_id)
     const groupedLegs = [];
+    
+    // 1. Initial Walking Leg (if applicable)
+    const firstTransitStopName = legs.length > 0 ? this.stops.get(legs[0].departure_stop)!.name : bestEndStopName;
+    const initialWalk = walkToStart.get(firstTransitStopName);
+    if (initialWalk && initialWalk > 0) {
+      groupedLegs.push({
+        board_stop_id: 'START',
+        board_stop_name: 'Origin',
+        alight_stop_id: legs.length > 0 ? legs[0].departure_stop : 'END',
+        alight_stop_name: firstTransitStopName,
+        departure_time: this.secondsToTime(startTime),
+        arrival_time: this.secondsToTime(startTime + initialWalk),
+        route_short_name: 'Walk',
+        route_long_name: 'Walking',
+        route_type: 99
+      });
+    }
+
     if (legs.length > 0) {
       let currentTrip = legs[0].trip_id;
       let startLeg = legs[0];
@@ -249,13 +341,28 @@ export class CSARouter {
       });
     }
 
-    const totalDuration = earliestArrival.get(endStop.name)! - startTime;
+    // 3. Final Walking Leg (if applicable)
+    if (finalWalkTime > 0) {
+      const lastArrivalTime = earliestArrival.get(bestEndStopName)!;
+      groupedLegs.push({
+        board_stop_id: legs.length > 0 ? legs[legs.length - 1].arrival_stop : 'START',
+        board_stop_name: bestEndStopName,
+        alight_stop_id: 'END',
+        alight_stop_name: 'Destination',
+        departure_time: this.secondsToTime(lastArrivalTime),
+        arrival_time: this.secondsToTime(lastArrivalTime + finalWalkTime),
+        route_short_name: 'Walk',
+        route_long_name: 'Walking',
+        route_type: 99
+      });
+    }
+
     return [{
       legs: groupedLegs,
-      total_duration_minutes: Math.round(totalDuration / 60),
+      total_duration_minutes: Math.round((bestTotalTime - startTime) / 60),
       departure_time: this.secondsToTime(startTime),
-      arrival_time: this.secondsToTime(earliestArrival.get(endStop.name)!),
-      num_transfers: Math.max(0, groupedLegs.length - 1)
+      arrival_time: this.secondsToTime(bestTotalTime),
+      num_transfers: Math.max(0, groupedLegs.filter(l => l.route_type !== 99).length - 1)
     }];
   }
 }

@@ -131,3 +131,9 @@ export function findGoogleAccountByUserId(userId: string): GoogleAccountRecord |
   const db = getDb();
   return db.prepare('SELECT * FROM google_accounts WHERE user_id = ?').get(userId) as GoogleAccountRecord | undefined;
 }
+
+export function cleanupExpiredSessions(): number {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at < ?').run(new Date().toISOString());
+  return result.changes;
+}
