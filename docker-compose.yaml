@@ -44,8 +44,12 @@ services:
       - |
         apk add --no-cache unzip curl &&
         if [ ! -f /data/LINZ_AG_GTFS_2026/stops.txt ]; then
-          echo "Extracting GTFS data..." &&
+          echo "Extracting Linz GTFS data..." &&
           unzip -o /data/LINZ_AG_GTFS_2026.zip -d /data/LINZ_AG_GTFS_2026
+        fi &&
+        if [ ! -f /data/OOEVV_GTFS_2026/stops.txt ]; then
+          echo "Extracting OOEVV GTFS data..." &&
+          unzip -o /data/OOEVV_GTFS_2026.zip -d /data/OOEVV_GTFS_2026
         fi &&
         npm install neo4j-driver dotenv &&
         node load-gtfs-neo4j.js
@@ -62,11 +66,10 @@ services:
       NEO4J_PROTOCOL: bolt
       NEO4J_BOLT_PORT: 7687
       DB_PATH: /data/smarthub.sqlite
+      NODE_OPTIONS: --max-old-space-size=4096
     depends_on:
       neo4j:
         condition: service_healthy
-      neo4j-loader:
-        condition: service_completed_successfully
     volumes:
       - smarthub_data:/data
     ports:
