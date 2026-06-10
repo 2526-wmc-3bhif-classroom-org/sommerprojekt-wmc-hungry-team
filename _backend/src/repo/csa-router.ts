@@ -193,13 +193,13 @@ export class CSARouter {
 
     if (startStops.length === 0 || endStops.length === 0) { return []; }
 
-    const earliestArrival = new Map<string, number>();
+    const earliestArrival = new Map<string, { time: number, transfers: number }>();
     const inConnection = new Map<string, any>(); 
     const tripReached = new Set<string>();
     const walkToStart = new Map<string, number>();
 
     for (const stop of this.stops.keys()) {
-      earliestArrival.set(stop, Infinity);
+      earliestArrival.set(stop, { time: Infinity, transfers: Infinity });
     }
     
     for (const { stop, walkTime } of startStops) {
@@ -219,11 +219,14 @@ export class CSARouter {
       const depStopId = c.departure_stop;
       const arrStopId = c.arrival_stop;
 
-      const canTake = earliestArrival.get(depStopId)! <= c.departure_time || tripReached.has(c.trip_id);
+      const depState = earliestArrival.get(depStopId)!;
+      const canTake = depState.time <= c.departure_time || tripReached.has(c.trip_id);
 
       if (canTake) {
-        if (c.arrival_time < earliestArrival.get(arrStopId)!) {
-          earliestArrival.set(arrStopId, c.arrival_time);
+        const arrState = earliestArrival.get(arrStopId)!;
+        const newTransfers = tripReached.has(c.trip_id) ? depState.transfers : depState.transfers + 1;
+        if (c.arrival_time < arrState.time || (c.arrival_time === arrState.time && newTransfers < arrState.transfers)) {
+          earliestArrival.set(arrStopId, { time: c.arrival_time, transfers: newTransfers });
           inConnection.set(arrStopId, c);
           tripReached.add(c.trip_id);
 
@@ -231,8 +234,9 @@ export class CSARouter {
           for (const fp of paths) {
             if (fp.from === fp.to) continue;
             const walkArr = c.arrival_time + fp.walkTime + TRANSFER_PENALTY;
-            if (walkArr < earliestArrival.get(fp.to)!) {
-              earliestArrival.set(fp.to, walkArr);
+            const fpState = earliestArrival.get(fp.to)!;
+            if (walkArr < fpState.time || (walkArr === fpState.time && newTransfers + 1 < fpState.transfers)) {
+              earliestArrival.set(fp.to, { time: walkArr, transfers: newTransfers + 1 });
               inConnection.set(fp.to, { type: 'footpath', from: fp.from, to: fp.to, walkTime: fp.walkTime, connectionTime: c.arrival_time });
             }
           }
@@ -245,7 +249,7 @@ export class CSARouter {
     let finalWalkTime = 0;
 
     for (const { stop, walkTime } of endStops) {
-      const arr = earliestArrival.get(stop.id)!;
+      const arr = earliestArrival.get(stop.id)!.time;
       if (arr !== Infinity) {
         const total = arr + walkTime;
         if (total < bestTotalTime) {
@@ -423,20 +427,20 @@ export class CSARouter {
 
     if (startStops.length === 0 || endStops.length === 0) { return []; }
 
-    const latestDeparture = new Map<string, number>();
+    const latestDeparture = new Map<string, { time: number, transfers: number }>();
     const outConnection = new Map<string, any>();
     const tripReached = new Set<string>();
     const walkToEnd = new Map<string, number>();
 
     for (const stop of this.stops.keys()) {
-      latestDeparture.set(stop, -Infinity);
+      latestDeparture.set(stop, { time: -Infinity, transfers: Infinity });
     }
     
     for (const { stop, walkTime } of endStops) {
       const dep = targetTime - walkTime;
       const existing = latestDeparture.get(stop.id)!;
-      if (dep > existing) {
-        latestDeparture.set(stop.id, dep);
+      if (dep > existing.time) {
+        latestDeparture.set(stop.id, { time: dep, transfers: 0 });
         walkToEnd.set(stop.id, walkTime);
       }
     }
@@ -447,11 +451,14 @@ export class CSARouter {
       const depStopId = c.departure_stop;
       const arrStopId = c.arrival_stop;
 
-      const canTake = latestDeparture.get(arrStopId)! >= c.arrival_time || tripReached.has(c.trip_id);
+      const arrState = latestDeparture.get(arrStopId)!;
+      const canTake = arrState.time >= c.arrival_time || tripReached.has(c.trip_id);
 
       if (canTake) {
-        if (c.departure_time > latestDeparture.get(depStopId)!) {
-          latestDeparture.set(depStopId, c.departure_time);
+        const depState = latestDeparture.get(depStopId)!;
+        const newTransfers = tripReached.has(c.trip_id) ? arrState.transfers : arrState.transfers + 1;
+        if (c.departure_time > depState.time || (c.departure_time === depState.time && newTransfers < depState.transfers)) {
+          latestDeparture.set(depStopId, { time: c.departure_time, transfers: newTransfers });
           outConnection.set(depStopId, c);
           tripReached.add(c.trip_id);
 
@@ -461,8 +468,9 @@ export class CSARouter {
             // Reverse direction: we are walking from fp.to to depStopId
             // So departure from fp.to must be (c.departure_time - walkTime - penalty)
             const walkDep = c.departure_time - fp.walkTime - TRANSFER_PENALTY;
-            if (walkDep > latestDeparture.get(fp.to)!) {
-              latestDeparture.set(fp.to, walkDep);
+            const fpState = latestDeparture.get(fp.to)!;
+            if (walkDep > fpState.time || (walkDep === fpState.time && newTransfers + 1 < fpState.transfers)) {
+              latestDeparture.set(fp.to, { time: walkDep, transfers: newTransfers + 1 });
               outConnection.set(fp.to, { type: 'footpath', from: fp.to, to: depStopId, walkTime: fp.walkTime, connectionTime: c.departure_time });
             }
           }
@@ -475,7 +483,7 @@ export class CSARouter {
     let initialWalkTime = 0;
 
     for (const { stop, walkTime } of startStops) {
-      const dep = latestDeparture.get(stop.id)!;
+      const dep = latestDeparture.get(stop.id)!.time;
       if (dep !== -Infinity) {
         const total = dep - walkTime;
         if (total > bestTotalTime) {
