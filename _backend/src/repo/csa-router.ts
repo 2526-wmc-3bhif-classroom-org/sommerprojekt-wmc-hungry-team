@@ -96,11 +96,12 @@ export class CSARouter {
         RETURN t.id as id, r.short_name as short_name, r.long_name as long_name, r.type as type
       `);
       for (const record of tripResult.records) {
+        const rawType = record.get('type');
         this.trips.set(record.get('id'), {
           id: record.get('id'),
           route_short_name: record.get('short_name') || '',
           route_long_name: record.get('long_name') || '',
-          route_type: record.get('type') ? (typeof record.get('type').toNumber === 'function' ? record.get('type').toNumber() : Number(record.get('type'))) : 3
+          route_type: (rawType !== null && rawType !== undefined) ? (typeof rawType.toNumber === 'function' ? rawType.toNumber() : Number(rawType)) : 3
         });
       }
       console.timeEnd('[CSA] Load Trips');
@@ -198,6 +199,10 @@ export class CSARouter {
     const tripReached = new Set<string>();
     const walkToStart = new Map<string, number>();
 
+    // NEW MAPS for correct reconstruction
+    const tripBoardStop = new Map<string, string>();
+    const tripPrevConnection = new Map<string, any>();
+
     for (const stop of this.stops.keys()) {
       earliestArrival.set(stop, { time: Infinity, transfers: Infinity });
     }
@@ -205,8 +210,8 @@ export class CSARouter {
     for (const { stop, walkTime } of startStops) {
       const arr = startTime + walkTime;
       const existing = earliestArrival.get(stop.id)!;
-      if (arr < existing) {
-        earliestArrival.set(stop.id, arr);
+      if (arr < existing.time) {
+        earliestArrival.set(stop.id, { time: arr, transfers: 0 });
         walkToStart.set(stop.id, walkTime);
       }
     }
@@ -220,15 +225,22 @@ export class CSARouter {
       const arrStopId = c.arrival_stop;
 
       const depState = earliestArrival.get(depStopId)!;
-      const canTake = depState.time <= c.departure_time || tripReached.has(c.trip_id);
+      const wasReached = tripReached.has(c.trip_id);
+      const canTake = depState.time <= c.departure_time || wasReached;
 
       if (canTake) {
+        // Mark trip as reached and save first boarding stop
+        tripReached.add(c.trip_id);
+        if (tripBoardStop.get(c.trip_id) === undefined) {
+          tripBoardStop.set(c.trip_id, c.departure_stop);
+        }
+        tripPrevConnection.set(c.trip_id + '_' + c.arrival_stop, c);
+
         const arrState = earliestArrival.get(arrStopId)!;
-        const newTransfers = tripReached.has(c.trip_id) ? depState.transfers : depState.transfers + 1;
+        const newTransfers = wasReached ? depState.transfers : depState.transfers + 1;
         if (c.arrival_time < arrState.time || (c.arrival_time === arrState.time && newTransfers < arrState.transfers)) {
           earliestArrival.set(arrStopId, { time: c.arrival_time, transfers: newTransfers });
           inConnection.set(arrStopId, c);
-          tripReached.add(c.trip_id);
 
           const paths = this.footpaths.get(arrStopId) || [];
           for (const fp of paths) {
@@ -260,8 +272,34 @@ export class CSARouter {
       }
     }
 
+    // Check if any transit route was found BEFORE comparing with walking
+    if (bestTotalTime === Infinity || !bestEndStopId) {
+      // No transit found — only offer walking if the distance is reasonable (< 3km)
+      const MAX_WALK_ONLY_METERS = 3000;
+      if (directWalkDist <= MAX_WALK_ONLY_METERS) {
+        const arrTime = startTime + directWalkTime;
+        return [{
+          legs: [{
+            board_stop_id: 'START', board_stop_name: 'Origin',
+            alight_stop_id: 'END', alight_stop_name: 'Destination',
+            departure_time: this.secondsToTime(startTime),
+            arrival_time: this.secondsToTime(arrTime),
+            route_short_name: 'Walk', route_long_name: 'Walking',
+            route_type: 99,
+            distance: directWalkDist
+          }],
+          total_duration_minutes: Math.round(directWalkTime / 60),
+          departure_time: this.secondsToTime(startTime),
+          arrival_time: this.secondsToTime(arrTime),
+          num_transfers: 0
+        }];
+      }
+      return [];
+    }
+
+    // Transit route found — check if walking is genuinely faster
     const transitTotalTime = bestTotalTime - startTime;
-    if (directWalkTime < transitTotalTime && directWalkTime < bestTotalTime) {
+    if (directWalkTime < transitTotalTime) {
       const arrTime = startTime + directWalkTime;
       return [{
         legs: [{
@@ -270,7 +308,8 @@ export class CSARouter {
           departure_time: this.secondsToTime(startTime),
           arrival_time: this.secondsToTime(arrTime),
           route_short_name: 'Walk', route_long_name: 'Walking',
-          route_type: 99
+          route_type: 99,
+          distance: directWalkDist
         }],
         total_duration_minutes: Math.round(directWalkTime / 60),
         departure_time: this.secondsToTime(startTime),
@@ -279,20 +318,32 @@ export class CSARouter {
       }];
     }
 
-    if (bestTotalTime === Infinity || !bestEndStopId) { return []; }
-
     const rawPath = [];
     let currentStopId = bestEndStopId;
     let currentItem = inConnection.get(currentStopId);
     
     while (currentItem) {
-      rawPath.unshift(currentItem);
       if (currentItem.type === 'footpath') {
+        rawPath.unshift(currentItem);
         currentStopId = currentItem.from;
+        currentItem = inConnection.get(currentStopId);
       } else {
-        currentStopId = currentItem.departure_stop;
+        const tripId = currentItem.trip_id;
+        const boardStopId = tripBoardStop.get(tripId)!;
+        
+        let tempStop = currentStopId;
+        let count = 0;
+        while (tempStop !== boardStopId) {
+          const conn = tripPrevConnection.get(tripId + '_' + tempStop);
+          if (!conn) break;
+          rawPath.unshift(conn);
+          tempStop = conn.departure_stop;
+          count++;
+          if (count > 100) break;
+        }
+        currentStopId = boardStopId;
+        currentItem = inConnection.get(currentStopId);
       }
-      currentItem = inConnection.get(currentStopId);
       if (rawPath.length > 200) break;
     }
 
@@ -310,7 +361,8 @@ export class CSARouter {
         arrival_time: this.secondsToTime(startTime + initialWalk),
         route_short_name: 'Walk',
         route_long_name: 'Walking',
-        route_type: 99
+        route_type: 99,
+        distance: Math.round(initialWalk * 1.4)
       });
     }
 
@@ -346,7 +398,8 @@ export class CSARouter {
             arrival_time: this.secondsToTime(item.connectionTime + item.walkTime),
             route_short_name: 'Walk',
             route_long_name: 'Transfer',
-            route_type: 99
+            route_type: 99,
+            distance: Math.round(item.walkTime * 1.4)
           });
         } else {
           if (item.trip_id === currentTrip) {
@@ -389,7 +442,7 @@ export class CSARouter {
     }
 
     if (finalWalkTime > 0) {
-      const lastArrivalTime = earliestArrival.get(bestEndStopId)!;
+      const lastArrivalTime = earliestArrival.get(bestEndStopId)!.time;
       groupedLegs.push({
         board_stop_id: rawPath.length > 0 ? (rawPath[rawPath.length - 1].type === 'footpath' ? rawPath[rawPath.length - 1].to : rawPath[rawPath.length - 1].arrival_stop) : bestEndStopId,
         board_stop_name: this.stops.get(bestEndStopId)?.name || '',
@@ -399,7 +452,8 @@ export class CSARouter {
         arrival_time: this.secondsToTime(lastArrivalTime + finalWalkTime),
         route_short_name: 'Walk',
         route_long_name: 'Walking',
-        route_type: 99
+        route_type: 99,
+        distance: Math.round(finalWalkTime * 1.4)
       });
     }
 
@@ -432,6 +486,10 @@ export class CSARouter {
     const tripReached = new Set<string>();
     const walkToEnd = new Map<string, number>();
 
+    // NEW MAPS for correct reconstruction
+    const tripAlightStop = new Map<string, string>();
+    const tripNextConnection = new Map<string, any>();
+
     for (const stop of this.stops.keys()) {
       latestDeparture.set(stop, { time: -Infinity, transfers: Infinity });
     }
@@ -448,19 +506,28 @@ export class CSARouter {
     for (const c of this.backwardConnections) {
       if (c.arrival_time > targetTime) continue;
       
+      // Save the connection for hop-by-hop traversal
+      tripNextConnection.set(c.trip_id + '_' + c.departure_stop, c);
+
       const depStopId = c.departure_stop;
       const arrStopId = c.arrival_stop;
 
       const arrState = latestDeparture.get(arrStopId)!;
-      const canTake = arrState.time >= c.arrival_time || tripReached.has(c.trip_id);
+      const wasReached = tripReached.has(c.trip_id);
+      const canTake = arrState.time >= c.arrival_time || wasReached;
 
       if (canTake) {
+        // Mark trip as reached and save first alight stop
+        tripReached.add(c.trip_id);
+        if (tripAlightStop.get(c.trip_id) === undefined) {
+          tripAlightStop.set(c.trip_id, arrStopId);
+        }
+
         const depState = latestDeparture.get(depStopId)!;
-        const newTransfers = tripReached.has(c.trip_id) ? arrState.transfers : arrState.transfers + 1;
+        const newTransfers = wasReached ? arrState.transfers : arrState.transfers + 1;
         if (c.departure_time > depState.time || (c.departure_time === depState.time && newTransfers < depState.transfers)) {
           latestDeparture.set(depStopId, { time: c.departure_time, transfers: newTransfers });
           outConnection.set(depStopId, c);
-          tripReached.add(c.trip_id);
 
           const paths = this.footpaths.get(depStopId) || [];
           for (const fp of paths) {
@@ -494,6 +561,32 @@ export class CSARouter {
       }
     }
     
+    // Check if any transit route was found BEFORE comparing with walking
+    if (bestTotalTime === -Infinity || !bestStartStopId) {
+      // No transit found — only offer walking if the distance is reasonable (< 3km)
+      const MAX_WALK_ONLY_METERS = 3000;
+      if (directWalkDist <= MAX_WALK_ONLY_METERS) {
+        const directWalkDep = targetTime - directWalkTime;
+        return [{
+          legs: [{
+            board_stop_id: 'START', board_stop_name: 'Origin',
+            alight_stop_id: 'END', alight_stop_name: 'Destination',
+            departure_time: this.secondsToTime(directWalkDep),
+            arrival_time: this.secondsToTime(targetTime),
+            route_short_name: 'Walk', route_long_name: 'Walking',
+            route_type: 99,
+            distance: directWalkDist
+          }],
+          total_duration_minutes: Math.round(directWalkTime / 60),
+          departure_time: this.secondsToTime(directWalkDep),
+          arrival_time: this.secondsToTime(targetTime),
+          num_transfers: 0
+        }];
+      }
+      return [];
+    }
+
+    // Transit route found — check if walking is genuinely faster (later departure = better)
     const directWalkDep = targetTime - directWalkTime;
     if (directWalkDep > bestTotalTime) {
       return [{
@@ -503,7 +596,8 @@ export class CSARouter {
           departure_time: this.secondsToTime(directWalkDep),
           arrival_time: this.secondsToTime(targetTime),
           route_short_name: 'Walk', route_long_name: 'Walking',
-          route_type: 99
+          route_type: 99,
+          distance: directWalkDist
         }],
         total_duration_minutes: Math.round(directWalkTime / 60),
         departure_time: this.secondsToTime(directWalkDep),
@@ -512,20 +606,32 @@ export class CSARouter {
       }];
     }
 
-    if (bestTotalTime === -Infinity || !bestStartStopId) { return []; }
-
     const rawPath = [];
     let currentStopId = bestStartStopId;
     let currentItem = outConnection.get(currentStopId);
     
     while (currentItem) {
-      rawPath.push(currentItem);
       if (currentItem.type === 'footpath') {
+        rawPath.push(currentItem);
         currentStopId = currentItem.to;
+        currentItem = outConnection.get(currentStopId);
       } else {
-        currentStopId = currentItem.arrival_stop;
+        const tripId = currentItem.trip_id;
+        const alightStopId = tripAlightStop.get(tripId)!;
+        
+        let tempStop = currentStopId;
+        let count = 0;
+        while (tempStop !== alightStopId) {
+          const conn = tripNextConnection.get(tripId + '_' + tempStop);
+          if (!conn) break;
+          rawPath.push(conn);
+          tempStop = conn.arrival_stop;
+          count++;
+          if (count > 100) break;
+        }
+        currentStopId = alightStopId;
+        currentItem = outConnection.get(currentStopId);
       }
-      currentItem = outConnection.get(currentStopId);
       if (rawPath.length > 200) break;
     }
 
@@ -541,7 +647,8 @@ export class CSARouter {
         arrival_time: this.secondsToTime(bestTotalTime + initialWalkTime),
         route_short_name: 'Walk',
         route_long_name: 'Walking',
-        route_type: 99
+        route_type: 99,
+        distance: Math.round(initialWalkTime * 1.4)
       });
     }
 
@@ -577,7 +684,8 @@ export class CSARouter {
             arrival_time: this.secondsToTime(item.connectionTime),
             route_short_name: 'Walk',
             route_long_name: 'Transfer',
-            route_type: 99
+            route_type: 99,
+            distance: Math.round(item.walkTime * 1.4)
           });
         } else {
           if (item.trip_id === currentTrip) {
@@ -632,7 +740,8 @@ export class CSARouter {
         arrival_time: this.secondsToTime(depTime + finalWalk),
         route_short_name: 'Walk',
         route_long_name: 'Walking',
-        route_type: 99
+        route_type: 99,
+        distance: Math.round(finalWalk * 1.4)
       });
     }
 

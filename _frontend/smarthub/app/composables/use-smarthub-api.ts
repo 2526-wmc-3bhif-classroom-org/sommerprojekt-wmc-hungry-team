@@ -118,6 +118,10 @@ export function useSmarthubApi() {
     )
   }
 
+  const updateMe = async (updates: { name?: string; email?: string; password?: string }) => {
+    return put<{ status: string }>('/api/auth/me', updates)
+  }
+
   const fetchSettings = async () => {
     return request<Record<string, unknown>>('GET', '/api/settings', {})
   }
@@ -154,6 +158,7 @@ export function useSmarthubApi() {
     register,
     logout,
     fetchMe,
+    updateMe,
     fetchSettings,
     updateSettings,
     fetchRoutines,

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useSettings } from '../composables/use-settings'
+import BusWidget from '../components/bus-widget.vue'
 import CarWidget from '../components/car-widget.vue'
+import MotivationWidget from '../components/motivation-widget.vue'
 
 const { preview, clearPreview, state } = useSettings()
 
@@ -18,19 +20,30 @@ function updateTime() {
   currentTime.value = `${hh}:${mm}`
 }
 
+updateTime()
+
 let timeInterval: ReturnType<typeof setInterval>
 onMounted(() => {
-  updateTime()
   timeInterval = setInterval(updateTime, 10000) // check every 10s
 })
 onUnmounted(() => clearInterval(timeInterval))
 
 const activeRoutine = computed(() => {
-  return state.value.routines.find(r => 
-    r.activeDays?.includes(currentDayOfWeek.value) && 
-    r.startTime <= currentTime.value && 
-    r.endTime >= currentTime.value
-  )
+  const timeVal = currentTime.value
+  if (!timeVal) return undefined
+
+  return state.value.routines.find(r => {
+    if (!r.activeDays?.includes(currentDayOfWeek.value)) return false
+
+    const start = r.startTime || '00:00'
+    const end = r.endTime || '23:59'
+
+    if (start <= end) {
+      return timeVal >= start && timeVal <= end
+    } else {
+      return timeVal >= start || timeVal <= end
+    }
+  })
 })
 
 const transportMode = computed(() => activeRoutine.value?.transportMode)
@@ -40,7 +53,7 @@ const transportMode = computed(() => activeRoutine.value?.transportMode)
   <div class="dashboard">
     <div class="dashboard__left">
       <clock-widget class="dashboard__clock" />
-      <weather-widget class="dashboard__weather" />
+      <weather-widget class="dashboard__weather" :active-destination="activeRoutine?.destination" />
       <appointments-widget class="dashboard__appointments" />
     </div>
     <div class="dashboard__right">
@@ -62,11 +75,11 @@ const transportMode = computed(() => activeRoutine.value?.transportMode)
         <div v-else>No routes found</div>
       </div>
 
-      <bus-widget v-if="transportMode === 'bus'" />
-      <car-widget v-else-if="transportMode === 'car'" />
-      <div v-else class="no-routine-msg">
-        Please configure a routine in the settings
-      </div>
+      <transition name="widget-fade" mode="out-in">
+        <bus-widget v-if="transportMode === 'bus'" :routine="activeRoutine" key="bus" />
+        <car-widget v-else-if="transportMode === 'car'" :routine="activeRoutine" key="car" />
+        <motivation-widget v-else key="motivation" />
+      </transition>
     </div>
   </div>
 </template>
@@ -84,12 +97,15 @@ const transportMode = computed(() => activeRoutine.value?.transportMode)
   gap: 20px;
   width: 35%;
   min-width: 320px;
+  height: 100%;
+  min-height: 0;
 }
 
 .dashboard__clock,
 .dashboard__weather,
 .dashboard__appointments {
   flex: 1;
+  min-height: 0;
 }
 
 .dashboard__right {
@@ -97,19 +113,27 @@ const transportMode = computed(() => activeRoutine.value?.transportMode)
   min-width: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
-.route-preview { background:#fff; padding:12px; border-radius:8px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06) }
-.route-preview__header { display:flex; justify-content:space-between; align-items:center }
-.route-card { padding:8px; border:1px solid #eee; border-radius:6px; margin-bottom:8px }
+.route-preview { background: var(--bg-surface); padding:12px; border-radius:8px; margin-bottom:12px; box-shadow: var(--shadow-widget) }
+.route-preview__header { display:flex; justify-content:space-between; align-items:center; color: var(--text-primary) }
+.route-card { padding:8px; border:1px solid var(--border-base); border-radius:6px; margin-bottom:8px; color: var(--text-primary) }
 
-.no-routine-msg {
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  padding: 32px;
-  text-align: center;
-  color: #6b7280;
-  font-size: 1.1rem;
+/* Widget transition styles */
+.widget-fade-enter-active,
+.widget-fade-leave-active {
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.widget-fade-enter-from {
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+}
+
+.widget-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.98);
 }
 </style>

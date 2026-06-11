@@ -184,7 +184,7 @@ const submit = async () => {
 }
 
 .auth-subtitle {
-  color: #6b7280;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -202,7 +202,7 @@ const submit = async () => {
 
 .auth-form input {
   padding: 12px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-base);
   border-radius: 10px;
   font-size: 1rem;
   transition: border-color 0.2s ease;
@@ -210,7 +210,7 @@ const submit = async () => {
 
 .auth-form input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 .auth-form input.input-error {
@@ -227,7 +227,7 @@ const submit = async () => {
   padding: 12px 16px;
   border-radius: 10px;
   border: none;
-  background: #3b82f6;
+  background: var(--color-primary);
   color: white;
   font-weight: 600;
   cursor: pointer;
@@ -239,7 +239,7 @@ const submit = async () => {
 }
 
 .auth-error {
-  color: #b91c1c;
+  color: var(--color-error-dark);
   margin: 0;
 }
 

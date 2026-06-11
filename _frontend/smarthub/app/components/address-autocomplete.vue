@@ -118,24 +118,24 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid var(--border-base);
+  background: var(--bg-surface-hover);
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-primary-strong);
   transition: all 0.2s;
 }
 
 .autocomplete-input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
   background: white;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .autocomplete-input:disabled {
-  background-color: #f3f4f6;
+  background-color: var(--border-light);
   cursor: not-allowed;
 }
 
@@ -144,7 +144,7 @@ onBeforeUnmount(() => {
   right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: #9ca3af;
+  color: var(--text-light);
   font-size: 0.8rem;
 }
 
@@ -155,7 +155,7 @@ onBeforeUnmount(() => {
   right: 0;
   margin-top: 4px;
   background: white;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-base);
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   z-index: 50;
@@ -169,8 +169,8 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #374151;
-  border-bottom: 1px solid #f3f4f6;
+  color: var(--text-primary-alt-2);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .autocomplete-item:last-child {
@@ -178,6 +178,6 @@ onBeforeUnmount(() => {
 }
 
 .autocomplete-item:hover {
-  background-color: #f3f4f6;
+  background-color: var(--border-light);
 }
 </style>

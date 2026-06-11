@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 export type AlarmItem = {
   id: string
@@ -21,21 +21,16 @@ export type RoutineItem = {
 
 export type GlobalSettings = {
   clockType: 'digital' | 'analog'
+  displaySpeed: 'very-slow' | 'slow' | 'medium' | 'fast' | 'very-fast'
+  weatherLocation: string
+  theme: 'light' | 'dark' | 'auto'
+  themeSchedule?: { light: string; dark: string }
 }
 
 export type Settings = {
   global: GlobalSettings
   routines: RoutineItem[]
 }
-
-// Module-level reactive state (shared across all components)
-const state = ref<Settings>({
-  global: { clockType: 'digital' },
-  routines: []
-})
-const preview = ref<any | null>(null)
-let loaded = false
-let loading: Promise<void> | null = null
 
 // Convert API routine response to frontend RoutineItem
 function apiToRoutineItem(r: any): RoutineItem {
@@ -70,45 +65,88 @@ function routineItemToApi(item: RoutineItem): Record<string, unknown> {
   }
 }
 
-async function doLoad() {
-  const { fetchSettings, fetchRoutines } = useSmarthubApi()
-  try {
-    const [settings, routines] = await Promise.all([
-      fetchSettings(),
-      fetchRoutines()
-    ])
-    state.value.global = {
-      clockType: (settings as any).clockType || 'digital'
-    }
-    state.value.routines = routines.map(apiToRoutineItem)
-    loaded = true
-  } catch (e) {
-    console.error('Failed to load settings from server', e)
-    // Keep defaults
-    loaded = true
-  }
-}
-
-export { state }
-
 export function useSettings() {
-  // Load from API once
-  if (!loaded && !loading) {
-    loading = doLoad().finally(() => { loading = null })
+  const state = useState<Settings>('app-settings', () => ({
+    global: { clockType: 'digital', displaySpeed: 'medium', weatherLocation: 'Linz, Austria', theme: 'light' },
+    routines: []
+  }))
+  
+  const preview = useState<any | null>('app-preview', () => null)
+  const currentHM = useState<string>('app-time', () => {
+    const d = new Date()
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  })
+
+  // Start time updates if in browser
+  if (import.meta.client) {
+    if (!(window as any)._smarthub_theme_timer) {
+      (window as any)._smarthub_theme_timer = setInterval(() => {
+        const d = new Date()
+        currentHM.value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      }, 60000)
+    }
   }
+
+  const resolvedTheme = computed(() => {
+    const settings = state.value.global
+    if (settings.theme === 'auto') {
+      const schedule = settings.themeSchedule || { light: '07:00', dark: '19:00' }
+      const now = currentHM.value || '00:00'
+      const light = schedule.light
+      const dark = schedule.dark
+      
+      if (light < dark) {
+        if (now >= light && now < dark) return 'light'
+        return 'dark'
+      } else {
+        if (now >= dark && now < light) return 'dark'
+        return 'light'
+      }
+    }
+    return settings.theme || 'light'
+  })
+
+  const loadFromServer = async () => {
+    const { fetchSettings, fetchRoutines } = useSmarthubApi()
+    try {
+      const [settings, routines] = await Promise.all([
+        fetchSettings(),
+        fetchRoutines()
+      ])
+      state.value.global = {
+        clockType: (settings as any).clockType || 'digital',
+        displaySpeed: (settings as any).displaySpeed || (settings as any).scrollSpeed || 'medium',
+        weatherLocation: (settings as any).weatherLocation || 'Linz, Austria',
+        theme: (settings as any).theme || 'light'
+      }
+      state.value.routines = routines.map(apiToRoutineItem)
+    } catch (e) {
+      console.error('Failed to load settings from server', e)
+    }
+  }
+
+  // Load from API on first use
+  useAsyncData('app-settings-load', async () => {
+    await loadFromServer()
+    return true
+  })
 
   function getGlobalSettings(): GlobalSettings {
     return state.value.global
   }
 
-  async function loadFromServer() {
-    await doLoad()
-  }
+  // ...
 
   async function saveGlobalSettings() {
     const { updateSettings } = useSmarthubApi()
     try {
-      await updateSettings({ clockType: state.value.global.clockType })
+      await updateSettings({ 
+        clockType: state.value.global.clockType,
+        displaySpeed: state.value.global.displaySpeed,
+        weatherLocation: state.value.global.weatherLocation,
+        theme: state.value.global.theme,
+        themeSchedule: state.value.global.themeSchedule
+      })
     } catch (e) {
       console.error('Failed to save settings', e)
     }
@@ -196,6 +234,7 @@ export function useSettings() {
   return {
     state,
     preview,
+    resolvedTheme,
     getGlobalSettings,
     addRoutineItem,
     updateRoutineItem,

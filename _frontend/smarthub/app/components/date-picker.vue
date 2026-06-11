@@ -85,14 +85,14 @@ function onClick(dateStr?: string | null) {
 </script>
 
 <style scoped>
-.datepicker { width: 320px; background: #fff; border-radius: 10px; padding: 12px; box-shadow: 0 8px 24px rgba(2,6,23,0.06) }
+.datepicker { width: 320px; background: var(--bg-surface); border-radius: 10px; padding: 12px; box-shadow: var(--shadow-widget) }
 .dp-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px }
 .dp-header button { background: transparent; border: none; font-size:18px; cursor:pointer }
 .dp-month { font-weight:700 }
 .dp-grid { display:grid; grid-template-columns: repeat(7, 1fr); gap:6px }
-.dp-weekday { font-size:12px; color:#6b7280; text-align:center }
+.dp-weekday { font-size:12px; color:var(--text-muted); text-align:center }
 .dp-cell { height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; cursor:pointer }
 .dp-empty { background: transparent }
-.dp-cell:hover { background: #f3f4f6 }
-.dp-selected { background: #2563eb; color: white; font-weight:700 }
+.dp-cell:hover { background: var(--border-light) }
+.dp-selected { background: var(--color-primary); color: #ffffff; font-weight:700 }
 </style>

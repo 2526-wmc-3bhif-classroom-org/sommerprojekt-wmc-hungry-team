@@ -79,9 +79,9 @@ onUnmounted(() => clearInterval(interval))
 
 <style scoped>
 .clock-widget {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow-widget);
   padding: 24px;
   height: 100%;
   box-sizing: border-box;
@@ -109,8 +109,8 @@ onUnmounted(() => clearInterval(interval))
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  border: 6px solid #f3f4f6;
-  background: #ffffff;
+  border: 6px solid var(--border-strong);
+  background: var(--bg-surface);
   position: relative;
   box-shadow: inset 0 2px 6px rgba(0,0,0,0.05);
   flex-shrink: 0;
@@ -136,7 +136,7 @@ onUnmounted(() => clearInterval(interval))
   display: block;
   width: 100%;
   height: 12px;
-  background: #e5e7eb;
+  background: var(--border-base);
 }
 
 .hand {
@@ -152,21 +152,21 @@ onUnmounted(() => clearInterval(interval))
   width: 6px;
   height: 25%;
   margin-left: -3px;
-  background: #1f2937;
+  background: var(--text-primary);
 }
 
 .minute-hand {
   width: 4px;
   height: 35%;
   margin-left: -2px;
-  background: #6b7280;
+  background: var(--text-muted);
 }
 
 .second-hand {
   width: 2px;
   height: 40%;
   margin-left: -1px;
-  background: #ef4444;
+  background: var(--color-error);
   z-index: 3;
 }
 
@@ -178,7 +178,7 @@ onUnmounted(() => clearInterval(interval))
   height: 12px;
   margin-left: -6px;
   margin-top: -6px;
-  background: #ef4444;
+  background: var(--color-error);
   border-radius: 50%;
   z-index: 4;
 }
@@ -186,14 +186,14 @@ onUnmounted(() => clearInterval(interval))
 .clock-widget__time {
   font-size: 3rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary);
   letter-spacing: 0.02em;
 }
 
 .clock-widget__date {
   font-size: 1.25rem;
   font-weight: 500;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 

@@ -21,8 +21,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        // Allow localhost
-        if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+        // Allow localhost and 127.0.0.1
+        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
             return callback(null, true);
         }
         // Allow private network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)

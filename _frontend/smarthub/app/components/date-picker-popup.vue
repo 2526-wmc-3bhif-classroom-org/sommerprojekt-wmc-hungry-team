@@ -64,6 +64,6 @@ const displayValue = computed(() => {
 
 <style scoped>
 .dp-popup-wrapper { position: relative; display: inline-block }
-.dp-input { padding:8px 10px; border-radius:8px; border:1px solid #e5e7eb; min-width:160px; cursor:pointer }
+.dp-input { padding:8px 10px; border-radius:8px; border:1px solid var(--border-base); min-width:160px; cursor:pointer }
 .dp-popup { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40 }
 </style>

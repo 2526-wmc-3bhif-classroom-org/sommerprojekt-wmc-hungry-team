@@ -19,6 +19,30 @@ const { geocodePlace, get, fetchMe, logout } = useSmarthubApi()
 
 const globalSettings = computed(() => getGlobalSettings())
 
+const speedValues = ['very-slow', 'slow', 'medium', 'fast', 'very-fast'] as const
+const speedLabels = ['Very Slow', 'Slow', 'Medium', 'Fast', 'Very Fast'] as const
+
+const displaySpeedNumber = computed({
+  get() {
+    const speed = globalSettings.value.displaySpeed || 'medium'
+    const idx = speedValues.indexOf(speed)
+    return idx !== -1 ? idx + 1 : 3
+  },
+  set(val: number) {
+    const idx = val - 1
+    if (idx >= 0 && idx < speedValues.length) {
+      globalSettings.value.displaySpeed = speedValues[idx]
+      saveGlobalSettings()
+    }
+  }
+})
+
+const currentDisplaySpeedLabel = computed(() => {
+  const speed = globalSettings.value.displaySpeed || 'medium'
+  const idx = speedValues.indexOf(speed)
+  return idx !== -1 ? speedLabels[idx] : 'Medium'
+})
+
 const routines = computed(() => state.value.routines)
 
 function addNewRoutine() { addRoutineItem() }
@@ -165,7 +189,7 @@ onMounted(async () => {
   <div class="settings-page">
     <transition name="toast-slide">
       <div v-if="toastMessage" class="ios-toast">
-        <div class="ios-toast-icon"><i class="fa-solid fa-circle-check" style="color: #10b981;"></i></div>
+        <div class="ios-toast-icon"><i class="fa-solid fa-circle-check" style="color: var(--weather-dest-color);"></i></div>
         <div class="ios-toast-text">{{ toastMessage }}</div>
       </div>
     </transition>
@@ -180,18 +204,126 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3><i class="fa-solid fa-display" style="color: #3b82f6; margin-right: 8px;"></i>Dashboard View</h3>
+          <h3><i class="fa-solid fa-display" style="color: var(--color-primary); margin-right: 8px;"></i>Dashboard View</h3>
         </div>
         <div class="routine-card">
           <div class="routine-card__body" style="padding: 16px 20px;">
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
-                <label class="field-label" style="font-size: 0.95rem; color: #111827; margin: 0; text-transform: none; letter-spacing: normal;">Clock Type</label>
+                <label class="field-label" style="font-size: 0.95rem; color: var(--text-primary-strong); margin: 0; text-transform: none; letter-spacing: normal;">Clock Type</label>
+                <p class="helper-text" style="margin-top: 4px;">Choose how the time is displayed on your dashboard.</p>
               </div>
-              <select :value="globalSettings.clockType" @change="(e) => { getGlobalSettings().clockType = (e.target as HTMLSelectElement).value as any; saveGlobalSettings() }" class="premium-select" style="min-width: 200px;">
-                <option value="digital">Digital (e.g. 14:30)</option>
-                <option value="analog">Analog (Clock face)</option>
-              </select>
+              <div class="transport-segment" style="min-width: 200px; justify-content: center;">
+                <button 
+                  type="button"
+                  class="segment-btn" 
+                  :class="{ active: globalSettings.clockType === 'digital' }"
+                  style="flex: 1; text-align: center;"
+                  @click="() => { getGlobalSettings().clockType = 'digital'; saveGlobalSettings() }"
+                >
+                  Digital
+                </button>
+                <button 
+                  type="button"
+                  class="segment-btn" 
+                  :class="{ active: globalSettings.clockType === 'analog' }"
+                  style="flex: 1; text-align: center;"
+                  @click="() => { getGlobalSettings().clockType = 'analog'; saveGlobalSettings() }"
+                >
+                  Analog
+                </button>
+              </div>
+            </div>
+            <div class="routine-card__row" style="align-items: center; justify-content: space-between; margin-top: 16px; border-top: 1px solid var(--border-light); padding-top: 16px;">
+              <div class="routine-card__field">
+                <label class="field-label" style="font-size: 0.95rem; color: var(--text-primary-strong); margin: 0; text-transform: none; letter-spacing: normal;">Information Cycle Speed</label>
+                <p class="helper-text" style="margin-top: 4px;">Set how fast the dashboard cycles through upcoming connections.</p>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: center; width: 200px; gap: 8px;">
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="5" 
+                  :value="displaySpeedNumber" 
+                  @input="(e) => { displaySpeedNumber = parseInt((e.target as HTMLInputElement).value) }" 
+                  class="premium-slider"
+                  style="width: 100%;"
+                />
+                <span style="font-size: 0.85rem; color: var(--color-primary); font-weight: 600;">{{ currentDisplaySpeedLabel }}</span>
+              </div>
+            </div>
+            <div class="routine-card__row" style="align-items: center; justify-content: space-between; margin-top: 16px; border-top: 1px solid var(--border-light); padding-top: 16px;">
+              <div class="routine-card__field">
+                <label class="field-label" style="font-size: 0.95rem; color: var(--text-primary-strong); margin: 0; text-transform: none; letter-spacing: normal;">Weather Location</label>
+                <p class="helper-text" style="margin-top: 4px;">Set your default city for local weather updates.</p>
+              </div>
+              <div style="width: 200px;">
+                <AddressAutocomplete 
+                  v-model="globalSettings.weatherLocation"
+                  placeholder="e.g. Linz, Austria"
+                  @update:modelValue="saveGlobalSettings"
+                />
+              </div>
+            </div>
+            <div class="routine-card__row" style="align-items: center; justify-content: space-between; margin-top: 16px; border-top: 1px solid var(--border-light); padding-top: 16px;">
+              <div class="routine-card__field">
+                <label class="field-label" style="font-size: 0.95rem; color: var(--text-primary-strong); margin: 0; text-transform: none; letter-spacing: normal;">Theme Appearance</label>
+                <p class="helper-text" style="margin-top: 4px;">Switch between light and dark mode, or set an automatic schedule.</p>
+              </div>
+              <div class="transport-segment" style="min-width: 200px; justify-content: center;">
+                <button 
+                  type="button"
+                  class="segment-btn" 
+                  :class="{ active: globalSettings.theme === 'light' }"
+                  style="flex: 1; text-align: center;"
+                  @click="() => { getGlobalSettings().theme = 'light'; saveGlobalSettings() }"
+                >
+                  <i class="fa-solid fa-sun" style="margin-right: 6px;"></i> Light
+                </button>
+                <button 
+                  type="button"
+                  class="segment-btn" 
+                  :class="{ active: globalSettings.theme === 'dark' }"
+                  style="flex: 1; text-align: center;"
+                  @click="() => { getGlobalSettings().theme = 'dark'; saveGlobalSettings() }"
+                >
+                  <i class="fa-solid fa-moon" style="margin-right: 6px;"></i> Dark
+                </button>
+                <button 
+                  type="button"
+                  class="segment-btn" 
+                  :class="{ active: globalSettings.theme === 'auto' }"
+                  style="flex: 1; text-align: center;"
+                  @click="() => { getGlobalSettings().theme = 'auto'; saveGlobalSettings() }"
+                >
+                  <i class="fa-solid fa-clock" style="margin-right: 6px;"></i> Auto
+                </button>
+              </div>
+            </div>
+            
+            <div v-if="globalSettings.theme === 'auto'" class="routine-card__row" style="margin-top: 12px; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px dashed var(--border-light);">
+              <div class="routine-card__field">
+                <label class="field-label" style="font-size: 0.85rem; color: var(--text-secondary);">Light Mode Starts</label>
+                <TimePicker 
+                  :model-value="globalSettings.themeSchedule?.light || '07:00'"
+                  @update:model-value="(val) => { 
+                    if (!globalSettings.themeSchedule) globalSettings.themeSchedule = { light: '07:00', dark: '19:00' };
+                    globalSettings.themeSchedule.light = val;
+                    saveGlobalSettings();
+                  }"
+                />
+              </div>
+              <div class="routine-card__field">
+                <label class="field-label" style="font-size: 0.85rem; color: var(--text-secondary);">Dark Mode Starts</label>
+                <TimePicker 
+                  :model-value="globalSettings.themeSchedule?.dark || '19:00'"
+                  @update:model-value="(val) => { 
+                    if (!globalSettings.themeSchedule) globalSettings.themeSchedule = { light: '07:00', dark: '19:00' };
+                    globalSettings.themeSchedule.dark = val;
+                    saveGlobalSettings();
+                  }"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -199,7 +331,7 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3><i class="fa-solid fa-clock" style="color: #3b82f6; margin-right: 8px;"></i>Your Routines</h3>
+          <h3><i class="fa-solid fa-clock" style="color: var(--color-primary); margin-right: 8px;"></i>Your Routines</h3>
           <button class="add-routine-btn-premium" @click="addNewRoutine">+ New Routine</button>
         </div>
 
@@ -269,7 +401,7 @@ onMounted(async () => {
                     updateRoutineItem(item);
                   }"
                 />
-                <span style="color: #6b7280; font-weight: 500;">to</span>
+                <span style="color: var(--text-muted); font-weight: 500;">to</span>
                 <TimePicker 
                   :model-value="item.endTime"
                   :min-time="item.arrivalTime"
@@ -332,7 +464,7 @@ onMounted(async () => {
 
       <section class="routines-section">
         <div class="routines-section-header">
-          <h3><i class="fa-solid fa-calendar-day" style="color: #3b82f6; margin-right: 8px;"></i>Integrations & Account</h3>
+          <h3><i class="fa-solid fa-calendar-day" style="color: var(--color-primary); margin-right: 8px;"></i>Integrations & Account</h3>
         </div>
         
         <div class="routine-card">
@@ -340,7 +472,7 @@ onMounted(async () => {
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
                 <label class="field-label">Google Calendar</label>
-                <div style="font-size: 0.9rem; color: #4b5563;">
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">
                   <span v-if="loadingStatus">Loading status...</span>
                   <span v-else-if="googleConnected">Connected as <b>{{ googleEmail }}</b></span>
                   <span v-else>Not connected</span>
@@ -351,14 +483,14 @@ onMounted(async () => {
               </button>
             </div>
             
-            <hr style="border: none; border-top: 1px solid #f3f4f6; margin: 0;" />
+            <hr style="border: none; border-top: 1px solid var(--border-light); margin: 0;" />
             
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
                 <label class="field-label">SmartHub Account</label>
-                <div style="font-size: 0.9rem; color: #4b5563;">Logged in on this device</div>
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">Logged in on this device</div>
               </div>
-              <button class="delete-routine-btn" style="border: 1px solid #fee2e2; border-radius: 8px;" @click="handleLogout">
+              <button class="delete-routine-btn" @click="handleLogout">
                 Logout
               </button>
             </div>
@@ -416,7 +548,7 @@ onMounted(async () => {
 }
 
 .auto-configure-btn {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
   color: white;
   border: none;
   border-radius: 12px;
@@ -438,8 +570,8 @@ onMounted(async () => {
   transition: transform 0.05s, box-shadow 0.05s;
 }
 .auto-configure-btn:disabled {
-  background: #e5e7eb;
-  color: #9ca3af;
+  background: var(--border-base);
+  color: var(--text-light);
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -458,7 +590,7 @@ onMounted(async () => {
   max-width: 640px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 20px;
   background: transparent;
   padding: 0;
   border-radius: 0;
@@ -478,40 +610,88 @@ onMounted(async () => {
 }
 
 .premium-select {
-  padding: 10px 14px;
+  padding: 10px 36px 10px 14px;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid var(--border-base);
+  background: var(--bg-surface-hover) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 12px center;
+  background-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-primary-strong);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .premium-select:hover {
-  border-color: #d1d5db;
+  border-color: var(--border-strong);
+  background-color: var(--border-light);
 }
 
 .premium-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  background: white;
+  border-color: var(--color-primary);
+  background-color: var(--bg-surface);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.premium-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-base);
+  outline: none;
+  transition: background 0.2s;
+}
+
+.premium-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: transform 0.1s ease, background-color 0.2s;
+}
+
+.premium-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #2563eb;
+}
+
+.premium-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: transform 0.1s ease, background-color 0.2s;
+}
+
+.premium-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  background: #2563eb;
 }
 
 button {
   padding: 8px 12px;
   border-radius: 8px;
   border: none;
-  background: #3b82f6;
-  color: white;
+  background: var(--border-strong);
+  color: var(--text-primary-strong);
   cursor: pointer;
 }
 
 .button-secondary {
-  background: #6b7280;
+  background: var(--text-muted);
 }
 
 .settings-page-header {
@@ -524,7 +704,7 @@ button {
 .settings-page-header h2 {
   font-size: 2rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary-strong);
   margin: 0;
 }
 
@@ -533,7 +713,7 @@ button {
   align-items: center;
   gap: 6px;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-muted);
   border: none;
   font-size: 0.95rem;
   font-weight: 500;
@@ -544,7 +724,7 @@ button {
 }
 
 .back-btn-premium:hover {
-  color: #111827;
+  color: var(--text-primary-strong);
 }
 
 /* Constrain home location input width so it doesn't span the entire screen */
@@ -557,7 +737,7 @@ button:disabled {
 .routines-section {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   width: 100%;
   max-width: 600px;
 }
@@ -572,12 +752,12 @@ button:disabled {
 .routines-section-header h3 {
   margin: 0;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary-strong);
 }
 
 .add-routine-btn-premium {
-  background: #111827;
-  color: white;
+  background: var(--border-strong);
+  color: var(--text-primary-strong);
   padding: 8px 16px;
   border-radius: 20px;
   font-weight: 500;
@@ -586,21 +766,20 @@ button:disabled {
 }
 
 .add-routine-btn-premium:hover {
-  background: #374151;
+  background: var(--text-primary-alt-2);
   transform: translateY(-1px);
 }
 
 .routine-card {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border: 1px solid #f3f4f6;
-  overflow: hidden;
+  border: 1px solid var(--border-light);
   transition: all 0.2s ease;
 }
 
 .routine-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px var(--shadow-widget);
 }
 
 .routine-card__header {
@@ -608,13 +787,15 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: #f9fafb;
-  border-bottom: 1px solid #f3f4f6;
+  background: var(--bg-surface-hover);
+  border-bottom: 1px solid var(--border-light);
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
 }
 
 .transport-segment {
   display: flex;
-  background: #e5e7eb;
+  background: var(--border-base);
   border-radius: 8px;
   padding: 4px;
   gap: 4px;
@@ -622,7 +803,7 @@ button:disabled {
 
 .segment-btn {
   background: transparent;
-  color: #6b7280;
+  color: var(--text-muted);
   border: none;
   padding: 6px 12px;
   border-radius: 6px;
@@ -633,22 +814,27 @@ button:disabled {
 }
 
 .segment-btn.active {
-  background: #ffffff;
-  color: #111827;
+  background: var(--bg-surface);
+  color: var(--text-primary-strong);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .delete-routine-btn {
-  background: transparent;
-  color: #ef4444;
+  background: var(--border-light);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-base);
+  border-radius: 8px;
   font-weight: 500;
   font-size: 0.9rem;
   padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .delete-routine-btn:hover {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--color-error);
+  color: #ffffff;
+  border-color: var(--color-error);
 }
 
 .routine-card__body {
@@ -679,7 +865,7 @@ button:disabled {
 .field-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #4b5563;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -687,7 +873,7 @@ button:disabled {
 .helper-text {
   margin: 0;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
@@ -698,8 +884,8 @@ button:disabled {
 
 .day-pill {
   flex: 1;
-  background: #f3f4f6;
-  color: #9ca3af;
+  background: var(--border-light);
+  color: var(--text-light);
   border: none;
   padding: 8px 0;
   border-radius: 8px;
@@ -710,9 +896,9 @@ button:disabled {
 }
 
 .day-pill--active {
-  background: #3b82f6;
-  color: #ffffff;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  background: var(--border-strong);
+  color: var(--text-primary-strong);
+  box-shadow: 0 2px 4px var(--shadow-widget);
 }
 
 .alarms-header {
@@ -722,15 +908,15 @@ button:disabled {
 }
 
 .add-alarm-btn {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--border-light);
+  color: var(--text-primary-alt-2);
   padding: 4px 12px;
   font-size: 0.8rem;
   border-radius: 12px;
 }
 
 .add-alarm-btn:hover {
-  background: #e5e7eb;
+  background: var(--border-base);
 }
 
 .alarms-list {
@@ -743,15 +929,15 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-base);
   padding: 6px 12px;
   border-radius: 12px;
 }
 
 .alarms-empty {
   font-size: 0.9rem;
-  color: #9ca3af;
+  color: var(--text-light);
   font-style: italic;
 }
 
@@ -772,7 +958,7 @@ button:disabled {
   position: absolute;
   cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: #d1d5db;
+  background-color: var(--border-strong);
   transition: .3s;
   border-radius: 20px;
 }
@@ -790,7 +976,7 @@ button:disabled {
 }
 
 .alarm-toggle input:checked + .slider {
-  background-color: #10b981;
+  background-color: var(--weather-dest-color);
 }
 
 .alarm-toggle input:checked + .slider:before {
@@ -799,13 +985,13 @@ button:disabled {
 
 .remove-alarm-btn {
   background: transparent;
-  color: #ef4444;
+  color: var(--color-error);
   font-size: 1rem;
   padding: 0 4px;
 }
 
 .remove-alarm-btn:hover {
-  color: #b91c1c;
+  color: var(--color-error-dark);
 }
 
 .settings-status {
@@ -820,6 +1006,6 @@ button:disabled {
 }
 
 .error {
-  color: #b91c1c
+  color: var(--color-error-dark)
 }
 </style>

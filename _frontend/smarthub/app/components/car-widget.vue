@@ -1,22 +1,19 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useSettings } from '../composables/use-settings'
+import { computed } from 'vue'
+import type { RoutineItem } from '../composables/use-settings'
 
-const { state } = useSettings()
+const props = defineProps<{
+  routine?: RoutineItem | null
+}>()
 
-const currentDayOfWeek = ref(new Date().getDay())
-
-const carRoutine = computed(() => {
-  return state.value.routines.find(r => r.activeDays?.includes(currentDayOfWeek.value) && r.transportMode === 'car')
-})
-
+const carRoutine = computed(() => props.routine)
 const destination = computed(() => carRoutine.value?.destination ?? '')
 const hasDestination = computed(() => destination.value.trim() !== '')
 </script>
 
 <template>
   <div class="car-widget">
-    <h3 class="car-widget__title"><i class="fa-solid fa-car" style="color: #3b82f6; margin-right: 8px;"></i>Route (Car)</h3>
+    <h3 class="car-widget__title"><i class="fa-solid fa-car" style="color: var(--color-primary); margin-right: 8px;"></i>Route (Car)</h3>
     <div v-if="!hasDestination" class="car-widget__status">
       Please configure destination address in the settings
     </div>
@@ -32,9 +29,9 @@ const hasDestination = computed(() => destination.value.trim() !== '')
 
 <style scoped>
 .car-widget {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow-widget);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -46,17 +43,17 @@ const hasDestination = computed(() => destination.value.trim() !== '')
 .car-widget__title {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary-alt-2);
   margin: 0;
 }
 
 .car-widget__status {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 
 .car-widget__route-label {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.875rem;
   margin-top: -8px;
 }
@@ -69,7 +66,7 @@ const hasDestination = computed(() => destination.value.trim() !== '')
   flex: 1;
   gap: 16px;
   text-align: center;
-  background: #f9fafb;
+  background: var(--bg-surface-hover);
   border-radius: 8px;
   padding: 32px 16px;
 }
@@ -79,7 +76,7 @@ const hasDestination = computed(() => destination.value.trim() !== '')
 }
 
 .car-widget__message {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 </style>

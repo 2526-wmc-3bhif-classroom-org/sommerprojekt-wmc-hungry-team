@@ -72,8 +72,8 @@ const handleBlur = () => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-base);
   border-radius: 8px;
   padding: 4px 8px;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
@@ -81,8 +81,8 @@ const handleBlur = () => {
 }
 
 .time-picker.is-invalid {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 1px #ef4444;
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 1px var(--color-error);
 }
 
 .time-input {
@@ -92,7 +92,7 @@ const handleBlur = () => {
   font-size: 1rem;
   font-family: inherit;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--text-primary);
   width: 36px;
   text-align: center;
   -moz-appearance: textfield;
@@ -101,7 +101,7 @@ const handleBlur = () => {
 
 .time-input:focus {
   outline: none;
-  background: #f3f4f6;
+  background: var(--border-light);
   border-radius: 6px;
 }
 
@@ -113,6 +113,6 @@ const handleBlur = () => {
 
 .time-separator {
   font-weight: 700;
-  color: #9ca3af;
+  color: var(--text-light);
 }
 </style>

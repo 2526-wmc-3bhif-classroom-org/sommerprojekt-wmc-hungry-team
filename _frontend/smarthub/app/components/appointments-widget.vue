@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { state } from '../composables/use-settings'
+import { useSettings } from '../composables/use-settings'
+
+const { state } = useSettings()
 
 const today = new Date()
 const currentDayOfWeek = computed(() => (today.getDay() + 6) % 7)
@@ -22,7 +24,7 @@ const activeAlarms = computed(() => {
 
 <template>
   <div class="appointments-widget">
-    <h3 class="appointments-widget__title"><i class="fa-solid fa-clock" style="color: #3b82f6; margin-right: 8px;"></i>Upcoming Alarms (Today)</h3>
+    <h3 class="appointments-widget__title"><i class="fa-solid fa-clock" style="color: var(--color-primary); margin-right: 8px;"></i>Upcoming Alarms (Today)</h3>
     <div v-if="activeAlarms.length === 0" class="appointments-widget__status">
       No alarms activated for today.
     </div>
@@ -39,19 +41,20 @@ const activeAlarms = computed(() => {
 
 <style scoped>
 .appointments-widget {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow-widget);
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .appointments-widget__title {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary-alt-2);
   margin: 0;
 }
 
@@ -59,10 +62,29 @@ const activeAlarms = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 6px;
+}
+
+/* Custom scrollbar styling */
+.appointments-widget__list::-webkit-scrollbar {
+  width: 6px;
+}
+.appointments-widget__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.appointments-widget__list::-webkit-scrollbar-thumb {
+  background: var(--border-stronger);
+  border-radius: 3px;
+}
+.appointments-widget__list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .appointments-widget__status {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 
@@ -71,20 +93,20 @@ const activeAlarms = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #f9fafb;
+  background: var(--bg-surface-hover);
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-base);
 }
 
 .appointments-widget__time {
   font-weight: 700;
   font-size: 1.25rem;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .alarm-badge {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--bg-primary-light);
+  color: var(--color-primary-dark);
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 0.85rem;

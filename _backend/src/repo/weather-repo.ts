@@ -65,8 +65,68 @@ export interface ForecastInterval {
   };
 }
 
-// Main function to fetch weather forecast
+interface CacheEntry {
+  timestamp: number;
+  data: WeatherForecast;
+}
+
+const weatherCache = new Map<string, CacheEntry>();
+const failedRequests = new Map<string, { timestamp: number; error: any }>();
+const inFlightRequests = new Map<string, Promise<WeatherForecast>>();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const FAILURE_TTL = 15 * 1000; // Cache errors/failures for 15 seconds (shorter for faster recovery)
+
+// Main function to fetch weather forecast (cached and deduplicated)
 export async function fetchWeatherForecast(lat: number, lon: number): Promise<WeatherForecast> {
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+
+  // 1. Check in-memory cache
+  const cached = weatherCache.get(key);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    console.log(`[Weather Cache] Cache hit for key: ${key}`);
+    return cached.data;
+  }
+
+  // Check failure cache (negative caching)
+  const failed = failedRequests.get(key);
+  if (failed && (Date.now() - failed.timestamp < FAILURE_TTL)) {
+    console.log(`[Weather Cache] Failure cache hit for key: ${key}. Re-throwing cached error.`);
+    throw failed.error;
+  }
+
+  // 2. Check in-flight requests (deduplication)
+  let promise = inFlightRequests.get(key);
+  if (promise) {
+    console.log(`[Weather Cache] Reusing in-flight request for key: ${key}`);
+    return promise;
+  }
+
+  // 3. Make request and manage maps
+  console.log(`[Weather Cache] Cache miss. Fetching from OpenMeteo for key: ${key}`);
+  promise = fetchWeatherForecastFromApi(lat, lon);
+  inFlightRequests.set(key, promise);
+
+  try {
+    const forecast = await promise;
+    weatherCache.set(key, {
+      timestamp: Date.now(),
+      data: forecast
+    });
+    failedRequests.delete(key); // clear failure cache on success
+    return forecast;
+  } catch (error: any) {
+    failedRequests.set(key, {
+      timestamp: Date.now(),
+      error: error
+    });
+    throw error;
+  } finally {
+    inFlightRequests.delete(key);
+  }
+}
+
+// Internal helper to fetch from OpenMeteo
+async function fetchWeatherForecastFromApi(lat: number, lon: number): Promise<WeatherForecast> {
   try {
     // Build OpenMeteo API URL
     const params = new URLSearchParams({
@@ -75,15 +135,9 @@ export async function fetchWeatherForecast(lat: number, lon: number): Promise<We
       hourly: [
         'temperature_2m',
         'apparent_temperature',
-        'relative_humidity_2m',
-        'precipitation',
-        'precipitation_probability',
         'weather_code',
         'cloud_cover',
         'wind_speed_10m',
-        'wind_direction_10m',
-        'wind_gusts_10m',
-        'visibility',
         'is_day'
       ].join(','),
       timezone: TIMEZONE,
@@ -92,11 +146,26 @@ export async function fetchWeatherForecast(lat: number, lon: number): Promise<We
     
     const url = `https://api.open-meteo.com/v1/forecast?${params}`;
     
-    // Fetch data from OpenMeteo
-    const data = await fetchJson(url);
+    // Fetch data from OpenMeteo (with rate-limit detection for automatic retry)
+    const data = await fetchJson(url, 30000, 3, 2000, (responseData) => {
+      if (responseData?.error) {
+        const reason = responseData.reason || 'Unknown API error';
+        throw new Error(`OpenMeteo rate limited: ${reason}`);
+      }
+    });
+    
+    // OpenMeteo returns HTTP 200 with {"error":true,"reason":"..."} on rate-limit/errors
+    if (data.error) {
+      const reason = data.reason || 'Unknown API error';
+      console.warn(`[Weather] OpenMeteo returned error: ${reason}`);
+      if (reason.toLowerCase().includes('concurrent') || reason.toLowerCase().includes('rate') || reason.toLowerCase().includes('too many')) {
+        throw new Error(`Weather API rate limited: ${reason}`);
+      }
+      throw new Error(`Weather API error: ${reason}`);
+    }
     
     if (!data.hourly) {
-      throw new Error('Invalid weather data');
+      throw new Error('Invalid weather data: missing hourly field');
     }
     
     // Get current time in Vienna timezone
@@ -140,16 +209,16 @@ export async function fetchWeatherForecast(lat: number, lon: number): Promise<We
         time: hourly.time[i],
         temperature: temperature,
         feelsLike: hourly.apparent_temperature[i],
-        humidity: hourly.relative_humidity_2m[i],
+        humidity: 0,
         windSpeed: hourly.wind_speed_10m[i],
-        windDirection: hourly.wind_direction_10m[i],
-        windGusts: hourly.wind_gusts_10m[i],
-        precipitation: hourly.precipitation[i],
-        precipitationProbability: hourly.precipitation_probability[i],
+        windDirection: 0,
+        windGusts: 0,
+        precipitation: 0,
+        precipitationProbability: 0,
         weatherCode: weatherCode,
         weatherDescription: WEATHER_CODE_MAP[weatherCode] || 'Unknown',
         cloudCover: cloudCover,
-        visibility: hourly.visibility[i],
+        visibility: 10000,
         isDay: isDay,
         conditions: conditions
       });
@@ -165,12 +234,19 @@ export async function fetchWeatherForecast(lat: number, lon: number): Promise<We
     };
     
   } catch (error: any) {
-    console.error('Weather API error:', error);
+    console.error('Weather API error:', error.message || error);
+    // Preserve specific error messages for rate-limiting and known issues
+    if (error.message?.includes('rate limited') || error.message?.includes('Rate limited')) {
+      throw error; // Preserve the rate-limit message for better debugging
+    }
     if (error.message?.includes('timeout')) {
       throw new Error('Weather service timeout');
     }
-    if (error.message?.includes('Invalid')) {
+    if (error.message?.includes('Invalid') || error.message?.includes('missing')) {
       throw new Error('Invalid weather data');
+    }
+    if (error.message?.includes('Weather API error')) {
+      throw error; // Preserve specific API errors
     }
     throw new Error('Weather service unavailable');
   }

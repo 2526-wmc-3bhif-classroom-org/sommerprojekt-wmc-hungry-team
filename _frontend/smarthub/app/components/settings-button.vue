@@ -29,7 +29,7 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: #3b82f6;
+  color: var(--color-primary);
   text-decoration: none;
   font-size: 44px;
   

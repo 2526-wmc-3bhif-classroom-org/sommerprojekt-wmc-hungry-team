@@ -267,8 +267,17 @@ async function loadGTFS() {
     const stopCount = existingStops.records[0].get('count');
     const count = typeof stopCount.toNumber === 'function' ? stopCount.toNumber() : Number(stopCount);
 
-    console.log('Clearing existing data (force reload)...');
-    await session.run('MATCH (n) DETACH DELETE n');
+    console.log('Clearing existing data (force reload in batches)...');
+    while (true) {
+      const countRes = await session.run('MATCH (n) RETURN count(n) AS count');
+      const rawCount = countRes.records[0].get('count');
+      const count = typeof rawCount.toNumber === 'function' ? rawCount.toNumber() : Number(rawCount);
+      if (count === 0) {
+        break;
+      }
+      console.log(`  Deleting batch... ${count} nodes remaining`);
+      await session.run('MATCH (n) WITH n LIMIT 10000 DETACH DELETE n');
+    }
 
     console.log('Creating constraints and indexes...');
     await session.run('CREATE CONSTRAINT IF NOT EXISTS FOR (s:Stop) REQUIRE s.id IS UNIQUE');
