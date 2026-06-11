@@ -1,0 +1,121 @@
+:root {
+  /* Backgrounds & Surfaces */
+  --bg-app: #f3f4f6;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f9fafb;
+  --bg-surface-muted: #f3f4f6;
+  --bg-surface-active: #eff6ff;
+
+  /* Typography */
+  --text-primary: #1f2937;
+  --text-primary-strong: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-light: #9ca3af;
+
+  /* Borders */
+  --border-light: #f3f4f6;
+  --border-base: #e5e7eb;
+  --border-strong: #d1d5db;
+  --border-stronger: #cbd5e1;
+
+  /* Accents */
+  --color-primary: #3b82f6;
+  --color-primary-dark: #1d4ed8;
+  --bg-primary-light: #eff6ff;
+
+  --color-error: #ef4444;
+  --color-error-dark: #b91c1c;
+
+  /* Weather Badges */
+  --weather-local-color: #3b82f6;
+  --weather-local-bg: #eff6ff;
+  --weather-dest-color: #10b981;
+  --weather-dest-bg: #ecfdf5;
+
+  /* Shadows */
+  --shadow-widget: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  /* Transit / Transport */
+  --transit-tram: #ef4444;
+  --transit-subway: #ec4899;
+  --transit-train: #6366f1;
+  --transit-bus: #17af7a;
+  --transit-walk: #3b82f6;
+  --transit-default: #3b82f6;
+  --transit-inactive: #cbd5e1;
+}
+
+[data-theme="dark"] {
+  /* Backgrounds & Surfaces */
+  --bg-app: #111827;
+  --bg-surface: #1f2937;
+  --bg-surface-hover: #374151;
+  --bg-surface-muted: #111827;
+  --bg-surface-active: rgba(59, 130, 246, 0.15);
+
+  /* Typography */
+  --text-primary: #f9fafb;
+  --text-primary-strong: #ffffff;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-light: #6b7280;
+
+  /* Borders */
+  --border-light: #1f2937;
+  --border-base: #374151;
+  --border-strong: #4b5563;
+  --border-stronger: #6b7280;
+
+  /* Accents */
+  --color-primary: #60a5fa;
+  --color-primary-dark: #93c5fd;
+  --bg-primary-light: rgba(59, 130, 246, 0.2);
+
+  --color-error: #f87171;
+  --color-error-dark: #fca5a5;
+
+  /* Weather Badges */
+  --weather-local-color: #60a5fa;
+  --weather-local-bg: rgba(59, 130, 246, 0.2);
+  --weather-dest-color: #34d399;
+  --weather-dest-bg: rgba(16, 185, 129, 0.2);
+
+  /* Shadows */
+  --shadow-widget: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  /* Transit / Transport */
+  --transit-tram: #f87171;
+  --transit-subway: #f472b6;
+  --transit-train: #818cf8;
+  --transit-bus: #34d399;
+  --transit-walk: #60a5fa;
+  --transit-default: #60a5fa;
+  --transit-inactive: #4b5563;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Global Subtle Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 10px;
+  border: 2px solid var(--bg-app);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

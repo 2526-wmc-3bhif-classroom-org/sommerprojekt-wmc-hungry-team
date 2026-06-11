@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import {
   cleanupExpiredOAuthStates,
+  cleanupExpiredSessions,
   consumeOAuthState,
   createOAuthState,
   createSession,
@@ -11,7 +12,8 @@ import {
   findGoogleAccountByUserId,
   findUserByEmail,
   findUserById,
-  upsertGoogleAccount
+  upsertGoogleAccount,
+  updateUser
 } from '../repo/auth-repo.js';
 import { AuthenticatedRequest, requireAuth, SESSION_COOKIE_NAME } from '../middleware/auth.js';
 import { validateEmail, validatePassword, validateRequiredString } from '../utils/validation.js';
@@ -75,11 +77,14 @@ router.post('/api/auth/register', async (req: Request, res: Response) => {
     });
 
     const sessionId = randomUUID();
+    const expiresAt = SESSION_MAX_AGE_DAYS > 0
+      ? new Date(Date.now() + SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      : null;
     createSession({
       id: sessionId,
       user_id: userId,
       created_at: now,
-      expires_at: null
+      expires_at: expiresAt
     });
     issueSessionCookie(res, sessionId);
 
@@ -113,15 +118,20 @@ router.post('/api/auth/login', async (req: Request, res: Response) => {
     }
 
     const sessionId = randomUUID();
+    const loginExpiresAt = SESSION_MAX_AGE_DAYS > 0
+      ? new Date(Date.now() + SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      : null;
     createSession({
       id: sessionId,
       user_id: user.id,
       created_at: new Date().toISOString(),
-      expires_at: null
+      expires_at: loginExpiresAt
     });
     issueSessionCookie(res, sessionId);
 
     res.json({ id: user.id, email: user.email, name: user.name });
+
+    try { cleanupExpiredSessions(); } catch (e) { console.error('Session cleanup error:', e); }
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -151,6 +161,44 @@ router.get('/api/auth/me', requireAuth, (req: AuthenticatedRequest, res: Respons
     googleConnected: Boolean(googleAccount),
     googleEmail: googleAccount?.email ?? null
   });
+});
+
+router.put('/api/auth/me', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const updates: any = { updated_at: new Date().toISOString() };
+    
+    if (req.body.email) {
+      const emailResult = validateEmail(req.body.email);
+      if (!emailResult.valid) return res.status(400).json({ error: emailResult.error });
+      const existing = findUserByEmail(emailResult.value);
+      if (existing && existing.id !== req.user.id) {
+        return res.status(409).json({ error: 'Email already in use' });
+      }
+      updates.email = emailResult.value;
+    }
+    
+    if (req.body.name) {
+      const nameResult = validateRequiredString(req.body.name, 'name');
+      if (!nameResult.valid) return res.status(400).json({ error: nameResult.error });
+      updates.name = nameResult.value;
+    }
+    
+    if (req.body.password) {
+      const passwordResult = validatePassword(req.body.password);
+      if (!passwordResult.valid) return res.status(400).json({ error: passwordResult.error });
+      updates.password_hash = await bcrypt.hash(passwordResult.value, 10);
+    }
+
+    updateUser(req.user.id, updates);
+    res.json({ status: 'ok' });
+  } catch (e) {
+    console.error('Update user error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.get('/api/auth/google/connect', requireAuth, (req: AuthenticatedRequest, res: Response) => {

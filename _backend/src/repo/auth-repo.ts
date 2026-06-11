@@ -61,6 +61,29 @@ export function findUserById(userId: string): UserRecord | undefined {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRecord | undefined;
 }
 
+export function updateUser(id: string, updates: { email?: string, name?: string, password_hash?: string, updated_at: string }) {
+  const db = getDb();
+  const sets: string[] = [];
+  const params: any = { id, updated_at: updates.updated_at };
+  
+  if (updates.email !== undefined) {
+    sets.push('email = @email');
+    params.email = updates.email;
+  }
+  if (updates.name !== undefined) {
+    sets.push('name = @name');
+    params.name = updates.name;
+  }
+  if (updates.password_hash !== undefined) {
+    sets.push('password_hash = @password_hash');
+    params.password_hash = updates.password_hash;
+  }
+  
+  sets.push('updated_at = @updated_at');
+  
+  db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = @id`).run(params);
+}
+
 export function createSession(session: SessionRecord) {
   const db = getDb();
   db.prepare(
@@ -130,4 +153,10 @@ export function upsertGoogleAccount(record: GoogleAccountRecord) {
 export function findGoogleAccountByUserId(userId: string): GoogleAccountRecord | undefined {
   const db = getDb();
   return db.prepare('SELECT * FROM google_accounts WHERE user_id = ?').get(userId) as GoogleAccountRecord | undefined;
+}
+
+export function cleanupExpiredSessions(): number {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at < ?').run(new Date().toISOString());
+  return result.changes;
 }

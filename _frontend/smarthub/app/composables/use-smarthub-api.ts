@@ -7,6 +7,10 @@ interface GeocodeResponse {
   }
 }
 
+export interface AutocompleteResult {
+  description: string
+  place_id: string
+}
 interface ServiceStatusResponse {
   status: 'ok' | 'error'
   backend: string
@@ -17,11 +21,19 @@ interface ServiceStatusResponse {
 type QueryValue = string | number
 
 function toApiError(error: unknown): Error {
+  // $fetch throws FetchError with .data containing the parsed JSON response body
+  if (error && typeof error === 'object' && 'data' in error) {
+    const data = (error as Record<string, unknown>).data
+    if (data && typeof data === 'object' && 'error' in data && typeof (data as Record<string, unknown>).error === 'string') {
+      return new Error((data as Record<string, unknown>).error as string)
+    }
+  }
+
   if (error instanceof Error) {
     return error
   }
 
-  return new Error('Unerwarteter API-Fehler')
+  return new Error('Unexpected API error')
 }
 
 export function useSmarthubApi() {
@@ -33,13 +45,14 @@ export function useSmarthubApi() {
   const request = async <T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
-    options: { query?: Record<string, QueryValue>; body?: unknown } = {}
+    options: { query?: Record<string, QueryValue>; body?: unknown; headers?: Record<string, string> } = {}
   ) => {
     try {
       return await $fetch<T>(buildUrl(path), {
         method,
         query: options.query,
         body: options.body,
+        headers: options.headers,
         credentials: 'include'
       })
     } catch (error) {
@@ -55,8 +68,20 @@ export function useSmarthubApi() {
     return request<T>('POST', path, { body })
   }
 
+  const put = async <T>(path: string, body: unknown) => {
+    return request<T>('PUT', path, { body })
+  }
+
+  const del = async <T>(path: string) => {
+    return request<T>('DELETE', path, {})
+  }
+
   const geocodePlace = async (place: string): Promise<GeocodeResponse> => {
     return get<GeocodeResponse>('/api/places/geocode', { place })
+  }
+
+  const autocompletePlace = async (query: string): Promise<AutocompleteResult[]> => {
+    return get<AutocompleteResult[]>('/api/places/autocomplete', { q: query })
   }
 
   const fetchServiceStatus = async (): Promise<ServiceStatusResponse> => {
@@ -82,18 +107,63 @@ export function useSmarthubApi() {
   const fetchMe = async () => {
     return request<{ user: { id: string; email: string; name: string }; googleConnected: boolean; googleEmail: string | null }>(
       'GET',
-      '/api/auth/me'
+      '/api/auth/me',
+      {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      } as any
     )
+  }
+
+  const updateMe = async (updates: { name?: string; email?: string; password?: string }) => {
+    return put<{ status: string }>('/api/auth/me', updates)
+  }
+
+  const fetchSettings = async () => {
+    return request<Record<string, unknown>>('GET', '/api/settings', {})
+  }
+
+  const updateSettings = async (settings: Record<string, unknown>) => {
+    return request<Record<string, unknown>>('PUT', '/api/settings', { body: settings })
+  }
+
+  const fetchRoutines = async () => {
+    return request<any[]>('GET', '/api/routines', {})
+  }
+
+  const createRoutine = async (routine: Record<string, unknown>) => {
+    return request<any>('POST', '/api/routines', { body: routine })
+  }
+
+  const updateRoutine = async (id: string, routine: Record<string, unknown>) => {
+    return request<any>('PUT', `/api/routines/${id}`, { body: routine })
+  }
+
+  const deleteRoutine = async (id: string) => {
+    return request<any>('DELETE', `/api/routines/${id}`, {})
   }
 
   return {
     get,
     post,
+    put,
+    del,
     geocodePlace,
+    autocompletePlace,
     fetchServiceStatus,
     login,
     register,
     logout,
     fetchMe,
+    updateMe,
+    fetchSettings,
+    updateSettings,
+    fetchRoutines,
+    createRoutine,
+    updateRoutine,
+    deleteRoutine,
   }
 }

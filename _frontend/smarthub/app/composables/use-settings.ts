@@ -1,129 +1,230 @@
-import { ref, readonly } from 'vue'
-
-export type RoutineItem = {
-  id: string
-  time: string // HH:MM or HH:MM:SS
-  title: string
-  location?: string
-}
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 export type AlarmItem = {
   id: string
-  time: string // HH:MM or HH:MM:SS
-  repeat: boolean
+  time: string
   enabled: boolean
 }
 
-export type DaySettings = {
+export type RoutineItem = {
+  id: string
+  name: string
+  startTime: string
+  endTime: string
+  arrivalTime: string
+  destination: string
+  startAddress: string
+  transportMode: 'bus' | 'car'
+  activeDays: number[] // 0 = Sun, 1 = Mon, ..., 6 = Sat
   alarms: AlarmItem[]
-  routine: RoutineItem[]
+}
+
+export type GlobalSettings = {
+  clockType: 'digital' | 'analog'
+  displaySpeed: 'very-slow' | 'slow' | 'medium' | 'fast' | 'very-fast'
+  weatherLocation: string
+  theme: 'light' | 'dark' | 'auto'
+  themeSchedule?: { light: string; dark: string }
 }
 
 export type Settings = {
-  homeLocation?: string
-  days: Record<string, DaySettings>
+  global: GlobalSettings
+  routines: RoutineItem[]
 }
 
-const STORAGE_KEY = 'smarthub-settings:v1'
-
-function emptyDay(): DaySettings {
-  return { alarms: [], routine: [] }
-}
-
-function loadFromStorage(): Settings {
-  if (typeof localStorage === 'undefined') {
-    return { days: {} }
-  }
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { days: {} }
-    return JSON.parse(raw)
-  } catch (e) {
-    console.warn('Failed to load settings', e)
-    return { days: {} }
+// Convert API routine response to frontend RoutineItem
+function apiToRoutineItem(r: any): RoutineItem {
+  return {
+    id: r.id,
+    name: r.name || 'Routine',
+    startTime: r.startTime || '08:00',
+    endTime: r.endTime || '09:00',
+    arrivalTime: r.arrivalTime || '08:00',
+    destination: r.destination || '',
+    startAddress: r.startAddress || '',
+    transportMode: r.transportMode || 'bus',
+    activeDays: r.days || [],
+    alarms: r.config?.alarms || []
   }
 }
 
-function save(s: Settings) {
-  if (typeof localStorage === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
+// Convert frontend RoutineItem to API request body
+function routineItemToApi(item: RoutineItem): Record<string, unknown> {
+  return {
+    name: item.name || 'Routine',
+    start_time: item.startTime,
+    end_time: item.endTime,
+    arrival_time: item.arrivalTime,
+    days: item.activeDays || [],
+    transport_mode: item.transportMode || 'bus',
+    destination: item.destination || '',
+    start_address: item.startAddress || '',
+    config: {
+      alarms: item.alarms || []
+    }
+  }
 }
-
-// Shared, module-level state so multiple components see the same preview
-const state = ref<Settings>({ days: {} })
-const preview = ref<any | null>(null)
-let hydrated = false
 
 export function useSettings() {
-  if (!hydrated && typeof localStorage !== 'undefined') {
-    state.value = loadFromStorage()
-    hydrated = true
+  const state = useState<Settings>('app-settings', () => ({
+    global: { clockType: 'digital', displaySpeed: 'medium', weatherLocation: 'Linz, Austria', theme: 'light' },
+    routines: []
+  }))
+  
+  const preview = useState<any | null>('app-preview', () => null)
+  const currentHM = useState<string>('app-time', () => {
+    const d = new Date()
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  })
+
+  // Start time updates if in browser
+  if (import.meta.client) {
+    if (!(window as any)._smarthub_theme_timer) {
+      (window as any)._smarthub_theme_timer = setInterval(() => {
+        const d = new Date()
+        currentHM.value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      }, 60000)
+    }
   }
 
-  function ensureDay(dayKey: string) {
-    if (!state.value.days[dayKey]) state.value.days[dayKey] = emptyDay()
+  const resolvedTheme = computed(() => {
+    const settings = state.value.global
+    if (settings.theme === 'auto') {
+      const schedule = settings.themeSchedule || { light: '07:00', dark: '19:00' }
+      const now = currentHM.value || '00:00'
+      const light = schedule.light
+      const dark = schedule.dark
+      
+      if (light < dark) {
+        if (now >= light && now < dark) return 'light'
+        return 'dark'
+      } else {
+        if (now >= dark && now < light) return 'dark'
+        return 'light'
+      }
+    }
+    return settings.theme || 'light'
+  })
+
+  const loadFromServer = async () => {
+    const { fetchSettings, fetchRoutines } = useSmarthubApi()
+    try {
+      const [settings, routines] = await Promise.all([
+        fetchSettings(),
+        fetchRoutines()
+      ])
+      state.value.global = {
+        clockType: (settings as any).clockType || 'digital',
+        displaySpeed: (settings as any).displaySpeed || (settings as any).scrollSpeed || 'medium',
+        weatherLocation: (settings as any).weatherLocation || 'Linz, Austria',
+        theme: (settings as any).theme || 'light'
+      }
+      state.value.routines = routines.map(apiToRoutineItem)
+    } catch (e) {
+      console.error('Failed to load settings from server', e)
+    }
   }
 
-  function getDay(dayKey: string) {
-    ensureDay(dayKey)
-    return state.value.days[dayKey]
+  // Load from API on first use
+  useAsyncData('app-settings-load', async () => {
+    await loadFromServer()
+    return true
+  })
+
+  function getGlobalSettings(): GlobalSettings {
+    return state.value.global
   }
 
-  function setHomeLocation(loc: string) {
-    state.value.homeLocation = loc
-    save(state.value)
+  // ...
+
+  async function saveGlobalSettings() {
+    const { updateSettings } = useSmarthubApi()
+    try {
+      await updateSettings({ 
+        clockType: state.value.global.clockType,
+        displaySpeed: state.value.global.displaySpeed,
+        weatherLocation: state.value.global.weatherLocation,
+        theme: state.value.global.theme,
+        themeSchedule: state.value.global.themeSchedule
+      })
+    } catch (e) {
+      console.error('Failed to save settings', e)
+    }
   }
 
-  function addAlarm(dayKey: string, time = '08:00') {
-    ensureDay(dayKey)
-    const alarm: AlarmItem = { id: crypto.randomUUID(), time, repeat: true, enabled: true }
-    state.value.days[dayKey].alarms.push(alarm)
-    save(state.value)
-    return alarm
+  async function addRoutineItem(): Promise<RoutineItem> {
+    const { createRoutine } = useSmarthubApi()
+    const now = new Date()
+    const hh = String(now.getHours()).padStart(2, '0')
+    const mm = String(now.getMinutes()).padStart(2, '0')
+    const currentTime = `${hh}:${mm}`
+
+    const newItem: RoutineItem = {
+      id: crypto.randomUUID(), // temporary
+      name: 'Routine',
+      startTime: '06:00',
+      endTime: '08:30',
+      arrivalTime: '08:00',
+      destination: '',
+      startAddress: '',
+      transportMode: 'bus',
+      activeDays: [1, 2, 3, 4, 5],
+      alarms: []
+    }
+
+    try {
+      const created = await createRoutine(routineItemToApi(newItem))
+      const item = apiToRoutineItem(created)
+      state.value.routines.push(item)
+      return item
+    } catch (e) {
+      console.error('Failed to create routine', e)
+      // Add locally as fallback
+      state.value.routines.push(newItem)
+      return newItem
+    }
   }
 
-  function updateAlarm(dayKey: string, updated: AlarmItem) {
-    ensureDay(dayKey)
-    const idx = state.value.days[dayKey].alarms.findIndex(a => a.id === updated.id)
-    if (idx !== -1) state.value.days[dayKey].alarms.splice(idx, 1, updated)
-    save(state.value)
+  async function updateRoutineItem(updated: RoutineItem) {
+    const idx = state.value.routines.findIndex(r => r.id === updated.id)
+    if (idx !== -1) {
+      state.value.routines[idx] = { ...updated }
+    }
+
+    // Debounced save to server
+    debouncedSaveRoutine(updated)
   }
 
-  function removeAlarm(dayKey: string, id: string) {
-    ensureDay(dayKey)
-    state.value.days[dayKey].alarms = state.value.days[dayKey].alarms.filter(a => a.id !== id)
-    save(state.value)
+  // Debounce map for routine saves
+  const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+  function debouncedSaveRoutine(item: RoutineItem) {
+    const existing = saveTimers.get(item.id)
+    if (existing) clearTimeout(existing)
+
+    saveTimers.set(item.id, setTimeout(async () => {
+      saveTimers.delete(item.id)
+      const { updateRoutine } = useSmarthubApi()
+      try {
+        await updateRoutine(item.id, routineItemToApi(item))
+      } catch (e) {
+        console.error('Failed to update routine', e)
+      }
+    }, 500))
   }
 
-  function addRoutineItem(dayKey: string, title = 'Title', time = '10:00', location?: string) {
-    ensureDay(dayKey)
-    const item: RoutineItem = { id: crypto.randomUUID(), title, time, location }
-    state.value.days[dayKey].routine.push(item)
-    save(state.value)
-    return item
+  async function removeRoutineItem(id: string) {
+    state.value.routines = state.value.routines.filter(r => r.id !== id)
+    const { deleteRoutine } = useSmarthubApi()
+    try {
+      await deleteRoutine(id)
+    } catch (e) {
+      console.error('Failed to delete routine', e)
+    }
   }
 
-  function updateRoutineItem(dayKey: string, updated: RoutineItem) {
-    ensureDay(dayKey)
-    const idx = state.value.days[dayKey].routine.findIndex(r => r.id === updated.id)
-    if (idx !== -1) state.value.days[dayKey].routine.splice(idx, 1, updated)
-    save(state.value)
-  }
-
-  function removeRoutineItem(dayKey: string, id: string) {
-    ensureDay(dayKey)
-    state.value.days[dayKey].routine = state.value.days[dayKey].routine.filter(r => r.id !== id)
-    save(state.value)
-  }
-
-  function resetAll() {
-    state.value = { days: {} }
-    save(state.value)
-  }
-
-  function setPreview(data: any) {
-    preview.value = data
+  function setPreview(p: any) {
+    preview.value = p
   }
 
   function clearPreview() {
@@ -131,18 +232,16 @@ export function useSettings() {
   }
 
   return {
-    state: readonly(state),
+    state,
     preview,
-    getDay,
-    setHomeLocation,
-    addAlarm,
-    updateAlarm,
-    removeAlarm,
+    resolvedTheme,
+    getGlobalSettings,
     addRoutineItem,
     updateRoutineItem,
     removeRoutineItem,
-    resetAll,
     setPreview,
     clearPreview,
+    saveGlobalSettings,
+    loadFromServer,
   }
 }

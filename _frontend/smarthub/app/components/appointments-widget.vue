@@ -1,52 +1,39 @@
 <script setup lang="ts">
-const loading = ref(true)
-const error = ref('')
-const serviceStatus = ref<{
-  backend: string
-  neo4j: 'up' | 'down'
-  timestamp: string
-} | null>(null)
+import { computed } from 'vue'
+import { useSettings } from '../composables/use-settings'
 
-const { fetchServiceStatus } = useSmarthubApi()
+const { state } = useSettings()
 
-const timestampDisplay = computed(() => {
-  if (!serviceStatus.value) return '--'
-  return new Date(serviceStatus.value.timestamp).toLocaleString('de-AT')
-})
+const today = new Date()
+const currentDayOfWeek = computed(() => (today.getDay() + 6) % 7)
 
-onMounted(async () => {
-  try {
-    const response = await fetchServiceStatus()
-    serviceStatus.value = {
-      backend: response.backend,
-      neo4j: response.neo4j,
-      timestamp: response.timestamp,
+const activeAlarms = computed(() => {
+  let alarms: any[] = []
+  
+  for (const r of state.value.routines) {
+    if (r.activeDays?.includes(currentDayOfWeek.value) && r.alarms) {
+      const validAlarms = r.alarms.filter((a: any) => a.enabled)
+      alarms.push(...validAlarms)
     }
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Backend-Status konnte nicht geladen werden'
-  } finally {
-    loading.value = false
   }
+  
+  alarms.sort((a, b) => a.time.localeCompare(b.time))
+  return alarms
 })
 </script>
 
 <template>
   <div class="appointments-widget">
-    <h3 class="appointments-widget__title">Backend Status</h3>
-    <div v-if="loading" class="appointments-widget__status">Lade Status...</div>
-    <div v-else-if="error" class="appointments-widget__status appointments-widget__status--error">{{ error }}</div>
-    <div v-else-if="serviceStatus" class="appointments-widget__list">
-      <div class="appointments-widget__item">
-        <span class="appointments-widget__time">API</span>
-        <span class="appointments-widget__title-text">{{ serviceStatus.backend }}</span>
-      </div>
-      <div class="appointments-widget__item">
-        <span class="appointments-widget__time">Neo4j</span>
-        <span class="appointments-widget__title-text">{{ serviceStatus.neo4j }}</span>
-      </div>
-      <div class="appointments-widget__item">
-        <span class="appointments-widget__time">Zuletzt</span>
-        <span class="appointments-widget__title-text">{{ timestampDisplay }}</span>
+    <h3 class="appointments-widget__title"><i class="fa-solid fa-clock" style="color: var(--color-primary); margin-right: 8px;"></i>Upcoming Alarms (Today)</h3>
+    <div v-if="activeAlarms.length === 0" class="appointments-widget__status">
+      No alarms activated for today.
+    </div>
+    <div v-else class="appointments-widget__list">
+      <div v-for="(alarm, idx) in activeAlarms" :key="idx" class="appointments-widget__item">
+        <span class="appointments-widget__time">{{ alarm.time }}</span>
+        <span class="appointments-widget__title-text">
+          <span class="alarm-badge">Active</span>
+        </span>
       </div>
     </div>
   </div>
@@ -54,19 +41,20 @@ onMounted(async () => {
 
 <style scoped>
 .appointments-widget {
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow-widget);
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .appointments-widget__title {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary-alt-2);
   margin: 0;
 }
 
@@ -74,38 +62,54 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 6px;
+}
+
+/* Custom scrollbar styling */
+.appointments-widget__list::-webkit-scrollbar {
+  width: 6px;
+}
+.appointments-widget__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.appointments-widget__list::-webkit-scrollbar-thumb {
+  background: var(--border-stronger);
+  border-radius: 3px;
+}
+.appointments-widget__list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .appointments-widget__status {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.95rem;
-}
-
-.appointments-widget__status--error {
-  color: #b91c1c;
 }
 
 .appointments-widget__item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.appointments-widget__item:last-child {
-  border-bottom: none;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-surface-hover);
+  border-radius: 8px;
+  border: 1px solid var(--border-base);
 }
 
 .appointments-widget__time {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #6b7280;
-  min-width: 50px;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--text-primary);
 }
 
-.appointments-widget__title-text {
-  font-size: 1rem;
-  color: #1f2937;
+.alarm-badge {
+  background: var(--bg-primary-light);
+  color: var(--color-primary-dark);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 </style>

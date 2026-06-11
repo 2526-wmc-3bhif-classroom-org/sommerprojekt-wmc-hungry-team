@@ -72,3 +72,46 @@ export async function geocodePlace(placeName: string): Promise<PlaceResult> {
     throw new Error('Geocoding service unavailable');
   }
 }
+
+export interface AutocompleteResult {
+  description: string;
+  place_id: string;
+}
+
+// Function to get autocomplete suggestions for a place
+export async function autocompletePlace(input: string): Promise<AutocompleteResult[]> {
+  const apiKey = process.env.GOOGLE_KEY;
+  
+  if (!apiKey) {
+    throw new Error('GOOGLE_KEY not configured');
+  }
+  
+  try {
+    const params = new URLSearchParams({
+      input: input,
+      key: apiKey,
+      components: 'country:at', // Bias to Austria
+      language: 'de'
+    });
+    
+    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params}`;
+    const data = await fetchJson(url);
+    
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      throw new Error(`Autocomplete API failed with status: ${data.status}`);
+    }
+    
+    if (data.status === 'ZERO_RESULTS') {
+      return [];
+    }
+    
+    return data.predictions.map((p: any) => ({
+      description: p.description,
+      place_id: p.place_id
+    }));
+    
+  } catch (error: any) {
+    console.error('Autocomplete API error:', error);
+    throw new Error('Autocomplete service unavailable');
+  }
+}

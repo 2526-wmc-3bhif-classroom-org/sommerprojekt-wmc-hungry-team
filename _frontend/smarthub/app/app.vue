@@ -5,14 +5,24 @@
     </NuxtLayout>
 
     <SettingsButton v-if="$route.path !== '/login'" />
+    <ProfileButton v-if="$route.path === '/settings'" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { useHead } from '#app'
+import { useSettings } from './composables/use-settings'
 import SettingsButton from './components/settings-button.vue'
+import ProfileButton from './components/profile-button.vue'
 
 const route = useRoute()
+const { getGlobalSettings, resolvedTheme } = useSettings()
+useHead({
+  htmlAttrs: {
+    'data-theme': resolvedTheme
+  }
+})
 </script>
 
 <style scoped>
