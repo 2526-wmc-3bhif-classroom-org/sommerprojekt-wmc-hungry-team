@@ -21,7 +21,7 @@ import { validateEmail, validatePassword, validateRequiredString } from '../util
 const router = Router();
 
 const SESSION_MAX_AGE_DAYS = Number.parseInt(process.env.SESSION_MAX_AGE_DAYS || '3650', 10);
-const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true' || (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production');
 
 function sessionCookieOptions() {
   const options: Record<string, any> = {
