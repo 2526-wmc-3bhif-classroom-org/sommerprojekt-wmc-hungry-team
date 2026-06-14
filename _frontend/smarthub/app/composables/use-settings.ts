@@ -234,6 +234,7 @@ export function useSettings() {
   return {
     state,
     preview,
+    currentHM,
     resolvedTheme,
     getGlobalSettings,
     addRoutineItem,
