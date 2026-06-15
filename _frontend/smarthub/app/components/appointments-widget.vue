@@ -2,16 +2,16 @@
 import { computed } from 'vue'
 import { useSettings } from '../composables/use-settings'
 
-const { state } = useSettings()
+const { state, currentHM } = useSettings()
 
 const today = new Date()
-const currentDayOfWeek = computed(() => (today.getDay() + 6) % 7)
+const currentDayOfWeek = computed(() => today.getDay())
 
 const activeAlarms = computed(() => {
   let alarms: any[] = []
   
   for (const r of state.value.routines) {
-    if (r.activeDays?.includes(currentDayOfWeek.value) && r.alarms) {
+    if (r.activeDays?.includes(currentDayOfWeek.value) && r.alarms?.length > 0) {
       const validAlarms = r.alarms.filter((a: any) => a.enabled)
       alarms.push(...validAlarms)
     }
@@ -20,19 +20,27 @@ const activeAlarms = computed(() => {
   alarms.sort((a, b) => a.time.localeCompare(b.time))
   return alarms
 })
+
+const nextAlarm = computed(() => {
+  if (activeAlarms.value.length === 0) return null
+  
+  const futureAlarms = activeAlarms.value.filter((a: any) => a.time > currentHM.value)
+  
+  return futureAlarms.length > 0 ? futureAlarms[0] : activeAlarms.value[0]
+})
 </script>
 
 <template>
   <div class="appointments-widget">
-    <h3 class="appointments-widget__title"><i class="fa-solid fa-clock" style="color: var(--color-primary); margin-right: 8px;"></i>Upcoming Alarms (Today)</h3>
-    <div v-if="activeAlarms.length === 0" class="appointments-widget__status">
-      No alarms activated for today.
+    <h3 class="appointments-widget__title"><i class="fa-solid fa-clock" style="color: var(--color-primary); margin-right: 8px;"></i>Next Alarm</h3>
+    <div v-if="!nextAlarm" class="appointments-widget__status">
+      No upcoming alarms for today.
     </div>
-    <div v-else class="appointments-widget__list">
-      <div v-for="(alarm, idx) in activeAlarms" :key="idx" class="appointments-widget__item">
-        <span class="appointments-widget__time">{{ alarm.time }}</span>
+    <div v-else class="appointments-widget__next-alarm">
+      <div class="appointments-widget__item">
+        <span class="appointments-widget__time">{{ nextAlarm.time }}</span>
         <span class="appointments-widget__title-text">
-          <span class="alarm-badge">Active</span>
+          <span class="alarm-badge">Next</span>
         </span>
       </div>
     </div>

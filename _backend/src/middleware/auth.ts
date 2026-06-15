@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { deleteSession, findSession, findUserById, PublicUser } from '../repo/auth-repo.js';
 
 export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'smarthub_session';
-const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true' || (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production');
 
 const CLEAR_COOKIE_OPTIONS = {
   httpOnly: true,

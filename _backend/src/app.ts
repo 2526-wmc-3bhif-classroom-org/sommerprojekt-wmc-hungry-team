@@ -41,6 +41,13 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use((req, res, next) => {
+    console.log(`[REQUEST] ${req.method} ${req.url} - Cookies: ${JSON.stringify(req.cookies || {})} - Header Cookie: ${req.headers.cookie || 'none'}`);
+    res.on('finish', () => {
+        console.log(`[RESPONSE] ${req.method} ${req.url} -> ${res.statusCode}`);
+    });
+    next();
+});
 
 getDb();
 

@@ -263,9 +263,15 @@ async function loadDataset(directory, prefix) {
 
 async function loadGTFS() {
   try {
+    const force = process.argv.includes('--force');
     const existingStops = await session.run('MATCH (s:Stop) RETURN count(s) AS count');
     const stopCount = existingStops.records[0].get('count');
     const count = typeof stopCount.toNumber === 'function' ? stopCount.toNumber() : Number(stopCount);
+
+    if (count > 0 && !force) {
+      console.log(`✓ Data already loaded in Neo4j (${count} stops found). Skipping loader. Run with --force to overwrite.`);
+      return;
+    }
 
     console.log('Clearing existing data (force reload in batches)...');
     while (true) {
