@@ -469,6 +469,7 @@ onMounted(async () => {
         
         <div class="routine-card">
           <div class="routine-card__body">
+            <!-- Commented out for now since the integration isn't fully ready.
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
                 <label class="field-label">Google Calendar</label>
@@ -484,6 +485,7 @@ onMounted(async () => {
             </div>
             
             <hr style="border: none; border-top: 1px solid var(--border-light); margin: 0;" />
+            -->
             
             <div class="routine-card__row" style="align-items: center; justify-content: space-between;">
               <div class="routine-card__field">
